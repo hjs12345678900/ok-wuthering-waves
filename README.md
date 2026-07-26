@@ -95,7 +95,7 @@
 
 ```bash
 # 1. 克隆项目
-git clone --recurse-submodules https://github.com/ok-oldking/ok-wuthering-waves.git
+git clone --recurse-submodules https://github.com/hjs12345678900/ok-wuthering-waves.git
 cd ok-wuthering-waves
 
 # 2. 创建虚拟环境
@@ -110,6 +110,10 @@ source .venv/bin/activate
 # 3. 安装依赖
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+
+# macOS：安装本仓库配套的 ok-script macOS 后端
+git clone https://github.com/hjs12345678900/ok-script.git ../ok-script
+python -m pip install -e ../ok-script
 
 # 4. 启动程序
 python main.py
