@@ -72,7 +72,6 @@ Windows 用户应使用上表中的原版 Windows 仓库及其 Releases；其中
 - macOS `.app` / `.dmg`：**尚未提供**。
 
 ## ✨ 主要功能
-<img width="1774" height="1182" alt="QQ_1762960844719" src="https://github.com/user-attachments/assets/c5eb0145-0d45-44f9-85b3-184de0ef20bf" />
 
 - **macOS 窗口捕获**：使用 ScreenCaptureKit 捕获原生《鸣潮》窗口，目前仍在实机兼容性测试。
 - **前台键鼠输入**：使用 Quartz 模拟输入，游戏必须位于前台。
