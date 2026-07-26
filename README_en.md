@@ -71,7 +71,7 @@ Kuro Games prohibits unauthorized third-party automation and may penalize accoun
 - **Window capture:** uses ScreenCaptureKit to capture the native Wuthering Waves window; compatibility is still being tested.
 - **Foreground input:** uses Quartz to simulate keyboard and mouse input; the game must remain in the foreground.
 - **Upstream tasks and recognition:** character detection, daily tasks, materials, and Echo workflows are inherited from upstream, but not every task has completed macOS real-device validation.
-- **Resolution adaptation:** inherits upstream 16:9 scaling; ultrawide displays and non-default scaling require separate validation.
+- **Resolution limitation:** the macOS version is currently tested and supported only at `1920×1080`. Other resolutions, ultrawide displays, and non-default scaling are not guaranteed to work.
 
 ## Troubleshooting
 

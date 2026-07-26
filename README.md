@@ -76,7 +76,7 @@ Windows 用户应使用上表中的原版 Windows 仓库及其 Releases；其中
 - **macOS 窗口捕获**：使用 ScreenCaptureKit 捕获原生《鸣潮》窗口，目前仍在实机兼容性测试。
 - **前台键鼠输入**：使用 Quartz 模拟输入，游戏必须位于前台。
 - **继承原版任务与识别逻辑**：角色识别、日常、材料、声骸等功能来自原版项目，但并非所有任务都已完成 macOS 实机验证。
-- **分辨率适配**：沿用原版的 16:9 分辨率适配；超宽屏和不同缩放比例需要单独验证。
+- **分辨率限制**：macOS 版本目前仅测试并支持 `1920×1080`；不承诺其他分辨率、超宽屏或非默认缩放比例能够正常工作。
 
 ## 🔧 疑难解答 (Troubleshooting)
 
@@ -89,15 +89,11 @@ Windows 用户应使用上表中的原版 Windows 仓库及其 Releases；其中
 5. **捕获**：先运行 `scripts/macos_probe.py --snapshot /tmp/ok-ww-macos.png`，确认截图正确后再启动任务。
 6. **输入**：同步游戏内自定义按键；首次只测试低风险操作。
 7. **日志**：报告问题时附上复现步骤、macOS/芯片型号、终端输出以及 `logs/ok-ww_error.log`，但不要公开账号或个人信息。
-9.  **关闭自动奔跑**：游戏设置里关闭自动奔跑。
+8. **关闭自动奔跑**：游戏设置里关闭自动奔跑。
 
 ---
 
 ## 💻 开发者专区
-
-### 普通用户安装（Windows）
-
-普通用户建议直接从[官方 Releases](https://github.com/ok-oldking/ok-wuthering-waves/releases)下载最新的 `setup.exe`，不要下载 GitHub 自动生成的 Source Code 压缩包。安装完成后从桌面快捷方式或开始菜单启动。
 
 ### macOS 源码测试版（完整安装步骤）
 
