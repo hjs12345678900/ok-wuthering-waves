@@ -2,24 +2,24 @@
   <h1 align="center">
     <img src="icon.png" width="200" alt="ok-ww logo"/>
     <br/>
-    ok-ww
+    OK-WW macOS（测试中）
   </h1> 
   
   <p>
-    一个基于图像识别的鸣潮自动化程序，支持后台运行，基于 <a href="https://github.com/ok-oldking/ok-script">ok-script</a> 开发。
+    一个处于实机测试阶段的《鸣潮》macOS 自动化脚本，基于实验性 <a href="https://github.com/hjs12345678900/ok-script">OK-Script macOS</a> 开发。
     <br />
-    An image-recognition-based automation tool for Wuthering Waves, with background mode support, developed with <a href="https://github.com/ok-oldking/ok-script">ok-script</a>.
+    An experimental Wuthering Waves automation script for macOS, developed with <a href="https://github.com/hjs12345678900/ok-script">OK-Script macOS</a>.
   </p>
   
-  <p><i>通过 Windows 接口模拟用户进行操作，无内存读取、无文件修改</i></p>
+  <p><i>非官方 macOS 派生版本；仅支持前台输入，仍在测试中</i></p>
 </div>
 
 <!-- Badges -->
 <div align="center">
   
-![平台](https://img.shields.io/badge/platform-Windows-blue)
-[![GitHub release](https://img.shields.io/github/v/release/ok-oldking/ok-wuthering-waves)](https://github.com/ok-oldking/ok-wuthering-waves/releases)
-[![总下载量](https://img.shields.io/github/downloads/ok-oldking/ok-wuthering-waves/total)](https://github.com/ok-oldking/ok-wuthering-waves/releases)
+![平台](https://img.shields.io/badge/platform-macOS-black?logo=apple)
+![状态](https://img.shields.io/badge/status-testing-orange)
+[![原版 Windows](https://img.shields.io/badge/original-Windows-blue)](https://github.com/ok-oldking/ok-wuthering-waves)
 [![Discord](https://img.shields.io/discord/296598043787132928?color=5865f2&label=%20Discord)](https://discord.gg/vVyCatEBgA)
 
 </div>
@@ -29,6 +29,20 @@
 **演示与教程:** [![YouTube](https://img.shields.io/badge/YouTube-%23FF0000.svg?style=for-the-badge&logo=YouTube&logoColor=white)](https://youtu.be/h6P1KWjdnB4)
 
 ---
+
+## 🍎 项目定位与上游
+
+> [!WARNING]
+> 这是基于原项目修改的非官方 macOS 测试分支，并非原作者发布的正式 macOS 版本。目前没有可双击安装的 `.app` 或 `.dmg`，请仅用于开发和低风险实机验证。
+
+| 用途 | 项目 |
+| --- | --- |
+| macOS《鸣潮》脚本（本测试分支） | [`hjs12345678900/ok-wuthering-waves`](https://github.com/hjs12345678900/ok-wuthering-waves) |
+| 配套 macOS 自动化框架 | [`hjs12345678900/ok-script`](https://github.com/hjs12345678900/ok-script) |
+| 原版 Windows《鸣潮》脚本与安装包 | [`ok-oldking/ok-wuthering-waves`](https://github.com/ok-oldking/ok-wuthering-waves) |
+| 原版 Windows / 模拟器自动化框架 | [`ok-oldking/ok-script`](https://github.com/ok-oldking/ok-script) |
+
+Windows 用户应使用上表中的原版 Windows 仓库及其 Releases；其中的 `.exe` 不能在 macOS 上运行。本分支当前仅支持游戏位于前台时的输入，ScreenCaptureKit 捕获、窗口识别和任务兼容性仍在持续测试。
 
 ## ⚠️ 免责声明
 
@@ -45,40 +59,36 @@
 
 ## 🚀 快速开始
 
-1.  **下载安装包**：从下方的“下载渠道”中选择一个，下载最新的 `ok-ww-win32-China-setup.exe` 安装文件。
-2.  **安装程序**：双击 `ok-ww-win32-China-setup.exe` 文件，并按照安装向导的提示完成安装。
-3.  **运行程序**：安装完成后，从桌面快捷方式或开始菜单启动 `ok-ww` 即可。
+1. macOS 用户请按照下方的[“macOS 源码测试版（完整安装步骤）”](#macos-源码测试版完整安装步骤)配置 Python 3.12、两个相邻仓库和系统权限。
+2. 首次自动化前，先运行权限探针并确认能够正确保存游戏窗口截图。
+3. 截图通过后使用 `python main_debug.py` 做低风险实机测试；暂时不要依赖后台或最小化运行。
+4. Windows 用户请前往[原版 OK-WW](https://github.com/ok-oldking/ok-wuthering-waves)下载正式安装包。
 
 ## 📥 下载渠道
 
-*   **[GitHub](https://github.com/ok-oldking/ok-wuthering-waves/releases)**: 官方发布页，全球访问速度快。（**请下载 `setup.exe` 安装包，而不是 `Source Code` 源码压缩包**）
-*   **[Mirror酱](https://mirrorchyan.com/zh/projects?rid=okww&source=ok-ww-readme)**: 国内镜像，下载可能需要购买其平台的 CD-KEY。
-*   **[百度网盘](https://pan.baidu.com/s/102Mh1djq2B1T-cIJhct9Gg?pwd=okww)**: 免费下载
-*   **[夸克网盘](https://pan.quark.cn/s/418018ddf7a0)**: 免费下载
+- **macOS 测试源码**：[`hjs12345678900/ok-wuthering-waves`](https://github.com/hjs12345678900/ok-wuthering-waves)。请使用 `git clone --recurse-submodules`，不要把 Windows `.exe` 当作 macOS 安装包。
+- **Windows 正式版及 Releases**：[`ok-oldking/ok-wuthering-waves`](https://github.com/ok-oldking/ok-wuthering-waves/releases)。
+- macOS `.app` / `.dmg`：**尚未提供**。
 
 ## ✨ 主要功能
 <img width="1774" height="1182" alt="QQ_1762960844719" src="https://github.com/user-attachments/assets/c5eb0145-0d45-44f9-85b3-184de0ef20bf" />
 
-*   **高分辨率支持**: 流畅运行于 4K 及以下所有 16:9 分辨率（最低 1600x900）。部分功能兼容 21:9 等超宽屏。
-*   **后台模式**: 支持游戏窗口最小化或被遮挡时在后台运行，不影响您使用电脑。
-*   **智能识别**: 全角色自动识别，无需手动配置技能序列，一键启动。
-*   **自动静音**: 在后台运行时，可自动将游戏静音。
+- **macOS 窗口捕获**：使用 ScreenCaptureKit 捕获原生《鸣潮》窗口，目前仍在实机兼容性测试。
+- **前台键鼠输入**：使用 Quartz 模拟输入，游戏必须位于前台。
+- **继承原版任务与识别逻辑**：角色识别、日常、材料、声骸等功能来自原版项目，但并非所有任务都已完成 macOS 实机验证。
+- **分辨率适配**：沿用原版的 16:9 分辨率适配；超宽屏和不同缩放比例需要单独验证。
 
 ## 🔧 疑难解答 (Troubleshooting)
 
 如果遇到问题，请在提问前按以下步骤逐一排查：
 
-1.  **安装路径**：请确保软件安装在**纯英文路径**下（例如 `D:\Games\ok-ww`），不要安装在 `C:\Program Files` 或包含中文字符的文件夹中。
-2.  **杀毒软件**：将软件的安装目录添加到您的杀毒软件（包括 Windows Defender）的**信任区或白名单**中，以防文件被误删或拦截。
-3.  **显示设置**：
-    *   关闭所有显卡滤镜（如 NVIDIA Game Filter）和锐化功能。
-    *   使用游戏默认的亮度设置。
-    *   关闭任何在游戏画面上显示信息的叠加层（如 MSI Afterburner、Fraps 等显示的帧率）。
-4.  **自定义按键**：如果您修改了游戏内的默认按键，请务必在 `ok-ww` 的设置中进行同步配置。仅支持设置中列出的按键。
-5.  **软件版本**：检查并确保您使用的是最新版本的 `ok-ww`。
-6.  **游戏性能**：请确保游戏能稳定在 **60 FPS** 运行。如果帧率不稳定，请尝试降低游戏画质或分辨率。
-7.  **游戏断线**：如频繁遇到与服务器断开连接的问题，可以尝试先手动打开游戏运行5分钟后再启动本工具，或在断线后直接重新登录，不要退出游戏。
-8.  **寻求帮助**：如果以上步骤都无法解决您的问题，请通过社区渠道提交详细的错误报告。
+1. **权限**：为启动程序的 Terminal 开启“屏幕与系统音频录制”和“辅助功能”，然后使用 `Command + Q` 完全退出并重开 Terminal。
+2. **环境**：确认已激活项目 `.venv`，并且 `python -c "import ok; print(ok.__file__)"` 指向相邻的 `ok-script/ok`。
+3. **子模块**：确认已经执行 `git submodule update --init --recursive`。
+4. **窗口**：先打开原生《鸣潮》客户端并保持在前台，不要最小化。
+5. **捕获**：先运行 `scripts/macos_probe.py --snapshot /tmp/ok-ww-macos.png`，确认截图正确后再启动任务。
+6. **输入**：同步游戏内自定义按键；首次只测试低风险操作。
+7. **日志**：报告问题时附上复现步骤、macOS/芯片型号、终端输出以及 `logs/ok-ww_error.log`，但不要公开账号或个人信息。
 9.  **关闭自动奔跑**：游戏设置里关闭自动奔跑。
 
 ---
@@ -176,10 +186,37 @@ python main.py
 
 #### 开发验证
 
+Windows 可以使用原项目提供的测试脚本：
+
+```powershell
+.\run_tests.ps1
+```
+
+macOS 上应让每个 `Test*.py` 在独立进程中运行，避免共享执行器退出造成连锁误报：
+
 ```bash
 python -m pip install -r requirements-dev.txt
-python -m pytest
+for test_file in tests/Test*.py; do
+  PYTHONPATH=../ok-script python -m unittest "$test_file" || exit 1
+done
 ```
+
+#### 标准开发与提交流程
+
+保留原项目为 `upstream`，所有修改在独立分支完成：
+
+```bash
+git remote add upstream https://github.com/ok-oldking/ok-wuthering-waves.git
+git fetch upstream
+git switch -c feature/your-change
+
+# 修改并完成相关测试后
+git status
+git add path/to/changed-file
+git commit -m "Describe the change"
+```
+
+提交 PR 时请说明修改目的、macOS 实机环境、测试结果和已知限制。不要提交 `.venv`、缓存、日志、截图、个人配置或游戏账号信息。更完整的贡献要求见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
 ### 命令行参数
 
@@ -187,7 +224,7 @@ python -m pytest
 
 ```bash
 # 示例：启动后自动执行第一个任务（一条龙），并在任务完成后退出程序
-ok-ww.exe -t 1 -e
+python main.py -t 1 -e
 ```
 
 *   `-t` 或 `--task`: 启动后自动执行第 N 个任务。`1` 代表任务列表中的第一个。
@@ -223,3 +260,7 @@ ok-ww.exe -t 1 -e
 *   [ok-oldking/OnnxOCR](https://github.com/ok-oldking/OnnxOCR)
 *   [zhiyiYo/PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets)
 *   [Toufool/AutoSplit](https://github.com/Toufool/AutoSplit)
+
+## 📄 许可证与派生开发
+
+本项目沿用原项目的 [GNU AGPL-3.0](LICENSE.txt) 许可证。许可证允许使用、修改、fork 和再发布，因此可以进行派生开发；但派生版本需要保留许可证和版权声明、明确说明修改，并按 AGPL-3.0 要求向使用者提供对应源代码。具体权利与义务以 `LICENSE.txt` 原文为准。

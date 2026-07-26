@@ -2,7 +2,7 @@
   <h1 align="center">
     <img src="icon.png" width="200" alt="ok-ww logo"/>
     <br/>
-    ok-ww
+    OK-WW macOS (Testing)
   </h1> 
   
   <p>
@@ -11,6 +11,9 @@
   
   <p><i>Windows のユーザーインターフェースをシミュレートして動作し、メモリの読み取りやファイルの改変は一切行いません。</i></p>
 </div>
+
+> [!WARNING]
+> この fork は、実機テスト中の非公式 macOS 実験版です。安定版の `.app` / `.dmg` はまだありません。現在の macOS セットアップと開発手順は[中国語 README](README.md)を参照してください。Windows ユーザーは[オリジナルの OK-WW](https://github.com/ok-oldking/ok-wuthering-waves)を使用してください。
 
 <!-- Badges -->
 <div align="center">
