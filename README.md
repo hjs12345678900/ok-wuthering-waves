@@ -89,84 +89,90 @@
 
 普通用户建议直接从[官方 Releases](https://github.com/ok-oldking/ok-wuthering-waves/releases)下载最新的 `setup.exe`，不要下载 GitHub 自动生成的 Source Code 压缩包。安装完成后从桌面快捷方式或开始菜单启动。
 
-### 从源码运行（Windows / macOS）
+### macOS 源码测试版（完整安装步骤）
 
-源码开发环境推荐且仅测试 **Python 3.12**。请先安装 Git 和 Python 3.12，然后执行：
+> [!IMPORTANT]
+> macOS 版目前是实验性源码测试版，还没有可双击安装的 `.app` 或 `.dmg`。Windows Releases 中的 `.exe` 不能在 Mac 上运行。测试者需要按下面的步骤配置一次 Python 环境。
+
+系统要求：macOS 12 或更高版本、Apple Silicon Mac、原生《鸣潮》客户端、Python 3.12、Git，以及 Xcode Command Line Tools。
+
+如果已经安装 [Homebrew](https://brew.sh/)，可以先执行：
 
 ```bash
-# 1. 克隆项目
-git clone --recurse-submodules https://github.com/hjs12345678900/ok-wuthering-waves.git
-cd ok-wuthering-waves
-
-# 2. 创建虚拟环境
-python3.12 -m venv .venv
-
-# macOS
-source .venv/bin/activate
-
-# Windows PowerShell（与上一条二选一）
-.\.venv\Scripts\Activate.ps1
-
-# 3. 安装依赖
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-
-# macOS：安装本仓库配套的 ok-script macOS 后端
-git clone https://github.com/hjs12345678900/ok-script.git ../ok-script
-python -m pip install -e ../ok-script
-
-# 4. 启动程序
-python main.py
-
-# 或启动 Debug 版本
-python main_debug.py
+xcode-select --install
+brew install python@3.12 git
 ```
 
-如果此前已经在未带 `--recurse-submodules` 的情况下克隆，请补充初始化模板素材：
+首次安装时，依次复制执行下面的全部命令。两个仓库必须放在同一个父目录：
+
+```bash
+# 1. 下载 macOS 后端和鸣潮项目
+git clone https://github.com/hjs12345678900/ok-script.git
+git clone --recurse-submodules https://github.com/hjs12345678900/ok-wuthering-waves.git
+
+# 2. 进入鸣潮项目并创建独立 Python 环境
+cd ok-wuthering-waves
+python3.12 -m venv .venv
+source .venv/bin/activate
+
+# 3. 安装项目依赖和配套的 macOS 后端
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m pip install -e ../ok-script
+
+# 4. 启动
+python main.py
+```
+
+如果此前下载项目时没有使用 `--recurse-submodules`，请在项目目录补充执行：
 
 ```bash
 git submodule update --init --recursive
 ```
 
-#### 同时开发本地 `ok-script`
-
-本项目依赖 `ok-script`。普通安装会使用 `requirements.txt` 中固定的正式版本；如果需要验证尚未发布的框架修改（例如本仓库配套的 macOS 后端），请将两个仓库放在同一父目录，并把本地框架以 editable 模式安装到同一虚拟环境：
-
-```text
-Games/
-├── ok-script/
-└── ok-wuthering-waves/
-```
+以后每次启动只需要：
 
 ```bash
 cd ok-wuthering-waves
-source .venv/bin/activate  # Windows 使用 .\.venv\Scripts\Activate.ps1
-python -m pip uninstall -y ok-script
-python -m pip install -e ../ok-script
+source .venv/bin/activate
+python main.py
+```
+
+首次运行时，在“系统设置 → 隐私与安全性”中，为启动程序的终端开启以下权限：
+
+- “屏幕与系统音频录制”
+- “辅助功能”
+
+授权后请完全退出并重新打开终端。打开《鸣潮》并保持游戏在前台，然后先检查权限和截图：
+
+```bash
+source .venv/bin/activate
+python scripts/macos_probe.py --prompt-permissions
+python scripts/macos_probe.py --snapshot /tmp/ok-ww-macos.png
+open /tmp/ok-ww-macos.png
+```
+
+截图正确后，可以使用 Debug 版本进行低风险实机测试：
+
+```bash
 python main_debug.py
 ```
 
-可用以下命令确认程序实际加载的是本地仓库：
+macOS 输入目前只在游戏位于前台时发送，不承诺最小化或后台运行。详细设计与已知限制见 [`docs/macos-port-plan.md`](docs/macos-port-plan.md) 和 [`docs/macos-pitfalls-2026-07-25.md`](docs/macos-pitfalls-2026-07-25.md)。
+
+### 从源码运行（Windows / 开发者）
+
+推荐使用 **Python 3.12**：
 
 ```bash
-python -c "import ok; print(ok.__file__)"
+git clone --recurse-submodules https://github.com/hjs12345678900/ok-wuthering-waves.git
+cd ok-wuthering-waves
+python3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python main.py
 ```
-
-输出路径应指向相邻的 `ok-script/ok` 目录。
-
-#### macOS 额外要求
-
-- 需要 macOS 12 或更高版本、Apple Silicon Mac，以及原生《鸣潮》客户端。
-- 安装 Xcode Command Line Tools；开发模式首次运行会使用 `swiftc` 编译 ScreenCaptureKit 辅助程序。
-- 在“系统设置 → 隐私与安全性”中，为启动程序的终端或应用开启“屏幕与系统音频录制”和“辅助功能”，然后完全重启该终端或应用。
-- 建议先运行权限与窗口探针：
-
-```bash
-python scripts/macos_probe.py --prompt-permissions
-python scripts/macos_probe.py --snapshot /tmp/ok-ww-macos.png
-```
-
-macOS 支持目前仍属于实验性 MVP：输入仅在游戏位于前台时发送，不承诺最小化或后台运行；首次使用请优先测试截图、窗口识别和低风险任务。详细设计与已知限制见 [`docs/macos-port-plan.md`](docs/macos-port-plan.md) 和 [`docs/macos-pitfalls-2026-07-25.md`](docs/macos-pitfalls-2026-07-25.md)。
 
 #### 开发验证
 
