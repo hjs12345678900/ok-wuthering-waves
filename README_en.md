@@ -1,134 +1,222 @@
 <div align="center">
   <h1 align="center">
-    <img src="icon.png" width="200" alt="ok-ww logo"/>
+    <img src="icon.png" width="200" alt="OK-WW logo"/>
     <br/>
     OK-WW macOS (Testing)
-  </h1> 
-  
+  </h1>
+
   <p>
-    An image-recognition-based automation tool for Wuthering Waves, with background mode support, developed with <a href="https://github.com/ok-oldking/ok-script">ok-script</a>.
+    An experimental Wuthering Waves automation script for macOS, built with
+    <a href="https://github.com/hjs12345678900/ok-script">OK-Script macOS</a>.
   </p>
-  
-  <p><i>Operates by simulating the Windows user interface, with no memory reading or file modification.</i></p>
+
+  <p><i>Unofficial macOS derivative; foreground input only; still under real-device testing</i></p>
 </div>
+
+<div align="center">
+
+![Platform](https://img.shields.io/badge/platform-macOS-black?logo=apple)
+![Status](https://img.shields.io/badge/status-testing-orange)
+[![Original Windows Version](https://img.shields.io/badge/original-Windows-blue)](https://github.com/ok-oldking/ok-wuthering-waves)
+
+</div>
+
+### English README | [中文说明](README.md)
+
+---
+
+## Project Status and Upstream
 
 > [!WARNING]
-> This fork is an unofficial experimental macOS port. It is still under real-device testing and does not provide a stable `.app` or `.dmg`. See the [Chinese README](README.md) for the current macOS setup and development workflow. Windows users should use the [original OK-WW repository](https://github.com/ok-oldking/ok-wuthering-waves).
+> This is an unofficial experimental macOS fork of the upstream project. It is not an official macOS release from the upstream author. No double-clickable `.app` or `.dmg` is currently provided.
 
-<!-- Badges -->
-<div align="center">
-  
-![Platform](https://img.shields.io/badge/platform-Windows-blue)
-[![GitHub release](https://img.shields.io/github/v/release/ok-oldking/ok-wuthering-waves)](https://github.com/ok-oldking/ok-wuthering-waves/releases)
-[![Total Downloads](https://img.shields.io/github/downloads/ok-oldking/ok-wuthering-waves/total)](https://github.com/ok-oldking/ok-wuthering-waves/releases)
-[![Discord](https://img.shields.io/discord/296598043787132928?color=5865f2&label=%20Discord)](https://discord.gg/vVyCatEBgA)
+> [!CAUTION]
+> This macOS port was produced primarily through AI-assisted **vibe coding**. It has not received a formal security audit, systematic code review, or complete real-device validation. AI-generated or AI-modified code may contain defects, incorrect assumptions, and unexpected behavior.
 
-</div>
+| Purpose | Repository |
+| --- | --- |
+| macOS Wuthering Waves script (this testing fork) | [`hjs12345678900/ok-wuthering-waves`](https://github.com/hjs12345678900/ok-wuthering-waves) |
+| Companion macOS automation framework | [`hjs12345678900/ok-script`](https://github.com/hjs12345678900/ok-script) |
+| Original Windows Wuthering Waves application and releases | [`ok-oldking/ok-wuthering-waves`](https://github.com/ok-oldking/ok-wuthering-waves) |
+| Original Windows/emulator automation framework | [`ok-oldking/ok-script`](https://github.com/ok-oldking/ok-script) |
 
-**Demo & Tutorial:** [![YouTube](https://img.shields.io/badge/YouTube-%23FF0000.svg?style=for-the-badge&logo=YouTube&logoColor=white)](https://youtu.be/h6P1KWjdnB4)
+Windows users should use the original repositories and their Releases. Windows `.exe` files do not run on macOS. This fork currently supports foreground input only; ScreenCaptureKit capture, window detection, and task compatibility remain under active testing.
 
----
+## Disclaimer and Risk
 
-## ⚠️ Disclaimer
+This software is an unofficial experimental third-party automation tool. It interacts with Wuthering Waves through screen capture and simulated user input. It does not read game memory or modify game files, but that does not guarantee safety, compliance with the game's terms of service, or freedom from detection.
 
-This software is an external auxiliary tool designed to automate parts of the Wuthering Waves gameplay. It interacts with the game solely by simulating standard user interface actions, in compliance with relevant laws and regulations. This project aims to simplify repetitive user tasks and does not disrupt game balance or provide an unfair advantage. It will never modify any game files or data.
+This project is free and open source and is intended only for personal learning, research, and testing. Review the source before use. You assume all risks, including account penalties or bans, unintended actions, loss of game progress or data, exposure caused by system permissions, device or software malfunction, and any other direct or indirect loss.
 
-This software is open-source and free, intended for personal learning and communication purposes only. Do not use it for any commercial or profit-making activities. The development team reserves the right of final interpretation. Any issues arising from the use of this software are not the responsibility of this project or its developers.
+Kuro Games prohibits unauthorized third-party automation and may penalize accounts that use macro scripts or similar tools.
 
-Please note, according to Kuro Games' official Fair Play Declaration for Wuthering Waves:
-> The use of any third-party tools to disrupt the game experience is strictly prohibited.
-> We will take strict measures against the use of unauthorized tools such as cheats, speed hacks, cheat software, and macro scripts. This includes, but is not limited to, automated farming, skill acceleration, god mode, teleportation, and modification of game data.
-> Once verified, we will impose penalties based on the severity and frequency of the violation, including but not limited to deducting illicit gains, and suspending or permanently banning the game account.
+**To the maximum extent permitted by applicable law, the maintainers and contributors of this fork, the upstream authors, and the relevant AI service providers are not liable for consequences arising from use of or inability to use this software. The software is provided “as is,” without express or implied warranties. By using it, you acknowledge and voluntarily accept all risks.**
 
-**By using this software, you acknowledge that you have read, understood, and agreed to the above statement, and you voluntarily assume all potential risks.**
+## Quick Start
 
-## 🚀 Quick Start
+1. Follow [Complete macOS Source Setup](#complete-macos-source-setup) to install Python 3.12, clone both repositories, and grant macOS permissions.
+2. Run the permission and capture probes before starting any automation.
+3. After a correct game-window snapshot is produced, use `python main_debug.py` for low-risk real-device testing.
+4. Do not rely on minimized or background operation.
+5. Windows users should download the stable application from the [original OK-WW repository](https://github.com/ok-oldking/ok-wuthering-waves).
 
-1.  **Download the Installer**: From the "Downloads" section below, download the latest `ok-ww-win32-setup.exe` installer file.
-2.  **Install the Program**: Double-click the `ok-ww-win32-setup.exe` file and follow the on-screen instructions to complete the installation.
-3.  **Run the Program**: After installation, launch `ok-ww` from the desktop shortcut or the Start Menu.
+## Downloads
 
-## 📥 Downloads
+- **macOS testing source:** [`hjs12345678900/ok-wuthering-waves`](https://github.com/hjs12345678900/ok-wuthering-waves). Clone it with `--recurse-submodules`.
+- **Original Windows releases:** [`ok-oldking/ok-wuthering-waves`](https://github.com/ok-oldking/ok-wuthering-waves/releases).
+- **macOS `.app` / `.dmg`:** not available yet.
 
-*   **[GitHub](https://github.com/ok-oldking/ok-wuthering-waves/releases)**: Official release page, fast access worldwide. (**Please download the `setup.exe` installer, not the `Source Code` archive**).
+## Current macOS Capabilities
 
-## ✨ Main Features
-<img width="1778" height="1186" alt="QQ_1762961412161" src="https://github.com/user-attachments/assets/0109c68e-d714-4c34-b016-b4b45f9861fd" />
+- **Window capture:** uses ScreenCaptureKit to capture the native Wuthering Waves window; compatibility is still being tested.
+- **Foreground input:** uses Quartz to simulate keyboard and mouse input; the game must remain in the foreground.
+- **Upstream tasks and recognition:** character detection, daily tasks, materials, and Echo workflows are inherited from upstream, but not every task has completed macOS real-device validation.
+- **Resolution limitation:** the macOS version is currently tested and supported only at `1920×1080`. Other resolutions, ultrawide displays, and non-default scaling are not guaranteed to work.
 
-*   **High-Resolution Support**: Runs smoothly on all 16:9 resolutions up to 4K (minimum 1600x900). Some features are also compatible with ultrawide resolutions like 21:9.
-*   **Background Mode**: Supports running in the background while the game window is minimized or obscured, allowing you to use your computer for other tasks.
-*   **Intelligent Recognition**: Automatically recognizes all characters, eliminating the need for manual skill sequence configuration. Start with a single click.
-*   **Auto-Mute**: Can automatically mute the game audio when running in the background.
+## Troubleshooting
 
-## 🔧 Troubleshooting
+1. **Permissions:** enable “Screen & System Audio Recording” and “Accessibility” for the Terminal that launches the app. Quit Terminal completely with `Command + Q`, then reopen it.
+2. **Environment:** activate the project `.venv` and verify that `python -c "import ok; print(ok.__file__)"` points to the sibling `ok-script/ok` directory.
+3. **Submodules:** run `git submodule update --init --recursive`.
+4. **Game window:** launch the native Wuthering Waves client first, keep it in the foreground, and do not minimize it.
+5. **Capture:** produce a snapshot with `scripts/macos_probe.py` before running tasks.
+6. **Input:** synchronize any custom in-game key bindings and begin with low-risk actions.
+7. **Bug reports:** include reproduction steps, macOS version, Mac model/chip, terminal output, and `logs/ok-ww_error.log`. Never publish account or personal information.
 
-If you encounter issues, please check the following steps one by one before asking for help:
+## Complete macOS Source Setup
 
-1.  **Installation Path**: Ensure the software is installed in a path containing **only English characters** (e.g., `D:\Games\ok-ww`). Do not install it in `C:\Program Files` or folders with non-English characters.
-2.  **Antivirus Software**: Add the software's installation directory to the **exceptions or whitelist** of your antivirus software (including Windows Defender) to prevent files from being mistakenly deleted or blocked.
-3.  **Display Settings**:
-    *   Turn off all graphics card filters (like NVIDIA Game Filter) and sharpening features.
-    *   Use the game's default brightness settings.
-    *   Disable any overlays that display information on the game screen (e.g., frame rates from MSI Afterburner, Fraps, etc.).
-4.  **Custom Keybinds**: If you have changed the default in-game keybinds, you must update them accordingly in the `ok-ww` settings. Only the keybinds listed in the settings are supported.
-5.  **Software Version**: Check and ensure you are using the latest version of `ok-ww`.
-6.  **Game Performance**: Make sure the game can run stably at **60 FPS**. If the frame rate is unstable, try lowering the game's graphics quality or resolution.
-7.  **Game Disconnections**: If you frequently get disconnected from the server, try launching the game manually and playing for 5 minutes before starting the tool. If you get disconnected, simply log back in without closing the game.
-8.  **Getting Help**: If the steps above do not solve your problem, please submit a detailed bug report through our community channels.
+### Requirements
 
----
+- macOS 12 or later
+- Apple Silicon Mac
+- Native Wuthering Waves client
+- Python 3.12
+- Git
+- Xcode Command Line Tools
 
-## 💻 Developer Zone
-
-### Running from Source (Python)
-
-This project only supports Python 3.12.
+If [Homebrew](https://brew.sh/) is installed:
 
 ```bash
-# Install or update dependencies
-pip install -r requirements.txt --upgrade
+xcode-select --install
+brew install python@3.12 git
+```
 
-# Run Release version
+### First Installation
+
+Clone both repositories into the same parent directory:
+
+```bash
+# 1. Clone the macOS backend and game script
+git clone https://github.com/hjs12345678900/ok-script.git
+git clone --recurse-submodules https://github.com/hjs12345678900/ok-wuthering-waves.git
+
+# 2. Create and activate the project environment
+cd ok-wuthering-waves
+python3.12 -m venv .venv
+source .venv/bin/activate
+
+# 3. Install dependencies and the companion macOS backend
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m pip install -e ../ok-script
+
+# 4. Start the application
 python main.py
+```
 
-# Run Debug version
+If the repository was cloned without `--recurse-submodules`:
+
+```bash
+git submodule update --init --recursive
+```
+
+### Later Launches
+
+```bash
+cd ok-wuthering-waves
+source .venv/bin/activate
+python main.py
+```
+
+### Permissions and Capture Probe
+
+Grant the launching Terminal:
+
+- Screen & System Audio Recording
+- Accessibility
+
+Quit and reopen Terminal after changing permissions. Start Wuthering Waves and keep it in the foreground, then run:
+
+```bash
+source .venv/bin/activate
+python scripts/macos_probe.py --prompt-permissions
+python scripts/macos_probe.py --snapshot /tmp/ok-ww-macos.png
+open /tmp/ok-ww-macos.png
+```
+
+If the snapshot is correct, start the debug build:
+
+```bash
 python main_debug.py
 ```
 
-### Command-Line Arguments
+## Development Workflow
 
-You can use command-line arguments for automated startup.
+Keep the original repository configured as `upstream` and work on a dedicated feature branch:
 
 ```bash
-# Example: Automatically run the first task after launch and exit the program upon completion
-ok-ww.exe -t 1 -e
+git remote add upstream https://github.com/ok-oldking/ok-wuthering-waves.git
+git fetch upstream
+git switch -c feature/your-change
 ```
 
-*   `-t` or `--task`: Automatically runs the Nth task in the list after launch. `1` represents the first task.
-*   `-e` or `--exit`: Automatically exits the program after the task is completed.
+Install development dependencies:
 
-## 💬 Join Us
+```bash
+python -m pip install -r requirements-dev.txt
+```
 
-This project is developed based on the [ok-script](https://github.com/ok-oldking/ok-script) framework. The core code is only about 3000 lines (Python), making it simple and easy to maintain. Developers interested in creating their own automation projects are welcome to use [ok-script](https://github.com/ok-oldking/ok-script).
+On macOS, run each `Test*.py` file in a separate process to avoid shared-executor shutdown cascades:
 
-## 🔗 Projects using ok-script:
+```bash
+for test_file in tests/Test*.py; do
+  PYTHONPATH=../ok-script python -m unittest "$test_file" || exit 1
+done
+```
 
-*   Wuthering Waves: [https://github.com/ok-oldking/ok-wuthering-waves](https://github.com/ok-oldking/ok-wuthering-waves)
-*   Genshin Impact (No longer maintained, but can still be used for auto-skipping dialogue in the background): [https://github.com/ok-oldking/ok-genshin-impact](https://github.com/ok-oldking/ok-genshin-impact)
-*   Girls' Frontline 2: [https://github.com/ok-oldking/ok-gf2](https://github.com/ok-oldking/ok-gf2)
-*   Honkai: Star Rail: [https://github.com/Shasnow/ok-starrailassistant](https://github.com/Shasnow/ok-starrailassistant)
-*   Starsee: [https://github.com/Sanheiii/ok-star-resonance](https://github.com/Sanheiii/ok-star-resonance)
-*   Duet Night Abyss: [https://github.com/BnanZ0/ok-duet-night-abyss](https://github.com/BnanZ0/ok-duet-night-abyss)
-*   Ash Echoes (Updates stopped): [https://github.com/ok-oldking/ok-baijing](https://github.com/ok-oldking/ok-baijing)
+Windows developers can use:
 
+```powershell
+.\run_tests.ps1
+```
 
-## ❤️ Sponsors & Acknowledgements
+After testing:
 
-### Sponsors
-*   **EXE Signing**: Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+```bash
+git status
+git add path/to/changed-file
+git commit -m "Describe the change"
+```
 
-### Acknowledgements
-*   [lazydog28/mc_auto_boss](https://github.com/lazydog28/mc_auto_boss)
-*   [ok-oldking/OnnxOCR](https://github.com/ok-oldking/OnnxOCR)
-*   [zhiyiYo/PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets)
-*   [Toufool/AutoSplit](https://github.com/Toufool/AutoSplit)
+Pull requests should describe the goal, macOS test environment, test results, and known limitations. Do not commit virtual environments, caches, logs, screenshots, personal configuration, or account information. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for additional upstream-oriented contribution guidance.
+
+## Command-Line Arguments
+
+```bash
+# Run the first task and exit when it completes
+python main.py -t 1 -e
+```
+
+- `-t` or `--task`: run the Nth task after launch.
+- `-e` or `--exit`: exit after the selected task completes.
+
+## Acknowledgements
+
+- [lazydog28/mc_auto_boss](https://github.com/lazydog28/mc_auto_boss)
+- [ok-oldking/OnnxOCR](https://github.com/ok-oldking/OnnxOCR)
+- [zhiyiYo/PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets)
+- [Toufool/AutoSplit](https://github.com/Toufool/AutoSplit)
+
+## License and Derivative Work
+
+This project remains licensed under the upstream [GNU AGPL-3.0](LICENSE.txt). The license permits use, modification, forking, and redistribution, but derivative versions must retain the license and copyright notices, identify their changes, and provide the corresponding source code as required by AGPL-3.0. Refer to `LICENSE.txt` for the controlling terms.

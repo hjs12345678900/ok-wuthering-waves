@@ -24,9 +24,7 @@
 
 </div>
 
-### [English Readme](README_en.md) | 中文说明 | [繁體中文說明](README_zh_TW.md) | [日本語Readme](README_ja.md)
-
-**演示与教程:** [![YouTube](https://img.shields.io/badge/YouTube-%23FF0000.svg?style=for-the-badge&logo=YouTube&logoColor=white)](https://youtu.be/h6P1KWjdnB4)
+### [English README](README_en.md) | 中文说明
 
 ---
 
@@ -34,6 +32,9 @@
 
 > [!WARNING]
 > 这是基于原项目修改的非官方 macOS 测试分支，并非原作者发布的正式 macOS 版本。目前没有可双击安装的 `.app` 或 `.dmg`，请仅用于开发和低风险实机验证。
+
+> [!CAUTION]
+> 本 macOS 移植主要由 AI 辅助的 **vibe coding** 完成，尚未经过正式安全审计、系统化代码审查或完整实机验证。AI 生成或修改的代码可能包含缺陷、错误假设和不可预期行为。
 
 | 用途 | 项目 |
 | --- | --- |
@@ -46,16 +47,16 @@ Windows 用户应使用上表中的原版 Windows 仓库及其 Releases；其中
 
 ## ⚠️ 免责声明
 
-本软件为外部辅助工具，旨在自动化《鸣潮》的部分游戏流程。它完全通过模拟常规用户界面与游戏交互，遵循相关法律法规。本项目旨在简化用户的重复性操作，不会破坏游戏平衡或提供不公平优势，也绝不会修改任何游戏文件或数据。
+本软件是未经官方认可的实验性第三方自动化工具，通过屏幕捕获和模拟用户输入与《鸣潮》交互。它不读取游戏内存，也不修改游戏文件，但这不代表其使用一定安全、符合游戏服务条款或不会触发检测。
 
-本软件开源、免费，仅供个人学习与交流使用，请勿用于任何商业或营利性目的。开发者团队拥有本项目的最终解释权。因使用本软件而产生的任何问题，均与本项目及开发者无关。
+本项目开源、免费，仅供个人学习、研究与测试。使用者应自行审查代码，并自行承担包括但不限于账号处罚或封禁、误操作、游戏进度或数据损失、系统权限暴露、设备或软件异常以及其他直接或间接损失的全部风险。
 
 请注意，根据库洛官方的《鸣潮》公平运营声明：
 > 严禁利用任何第三方工具破坏游戏体验。
 > 我们将严厉打击使用外挂、加速器、作弊软件、宏脚本等违规工具的行为，这些行为包括但不限于自动挂机、技能加速、无敌模式、瞬移、修改游戏数据等操作。
 > 一经查证，我们将视违规情况和次数，采取包括但不限于扣除违规收益、冻结或永久封禁游戏账号等措施。
 
-**使用本软件即表示您已阅读、理解并同意以上声明，并自愿承担一切潜在风险。**
+**在适用法律允许的最大范围内，本 fork 的维护者、贡献者、上游作者及相关 AI 服务提供方不对使用或无法使用本软件造成的任何后果负责。本软件按“原样”提供，不作任何明示或默示保证。使用本软件即表示您已理解并自愿承担全部风险。**
 
 ## 🚀 快速开始
 
@@ -71,12 +72,11 @@ Windows 用户应使用上表中的原版 Windows 仓库及其 Releases；其中
 - macOS `.app` / `.dmg`：**尚未提供**。
 
 ## ✨ 主要功能
-<img width="1774" height="1182" alt="QQ_1762960844719" src="https://github.com/user-attachments/assets/c5eb0145-0d45-44f9-85b3-184de0ef20bf" />
 
 - **macOS 窗口捕获**：使用 ScreenCaptureKit 捕获原生《鸣潮》窗口，目前仍在实机兼容性测试。
 - **前台键鼠输入**：使用 Quartz 模拟输入，游戏必须位于前台。
 - **继承原版任务与识别逻辑**：角色识别、日常、材料、声骸等功能来自原版项目，但并非所有任务都已完成 macOS 实机验证。
-- **分辨率适配**：沿用原版的 16:9 分辨率适配；超宽屏和不同缩放比例需要单独验证。
+- **分辨率限制**：macOS 版本目前仅测试并支持 `1920×1080`；不承诺其他分辨率、超宽屏或非默认缩放比例能够正常工作。
 
 ## 🔧 疑难解答 (Troubleshooting)
 
@@ -89,15 +89,11 @@ Windows 用户应使用上表中的原版 Windows 仓库及其 Releases；其中
 5. **捕获**：先运行 `scripts/macos_probe.py --snapshot /tmp/ok-ww-macos.png`，确认截图正确后再启动任务。
 6. **输入**：同步游戏内自定义按键；首次只测试低风险操作。
 7. **日志**：报告问题时附上复现步骤、macOS/芯片型号、终端输出以及 `logs/ok-ww_error.log`，但不要公开账号或个人信息。
-9.  **关闭自动奔跑**：游戏设置里关闭自动奔跑。
+8. **关闭自动奔跑**：游戏设置里关闭自动奔跑。
 
 ---
 
 ## 💻 开发者专区
-
-### 普通用户安装（Windows）
-
-普通用户建议直接从[官方 Releases](https://github.com/ok-oldking/ok-wuthering-waves/releases)下载最新的 `setup.exe`，不要下载 GitHub 自动生成的 Source Code 压缩包。安装完成后从桌面快捷方式或开始菜单启动。
 
 ### macOS 源码测试版（完整安装步骤）
 
@@ -230,14 +226,6 @@ python main.py -t 1 -e
 *   `-t` 或 `--task`: 启动后自动执行第 N 个任务。`1` 代表任务列表中的第一个。
 *   `-e` 或 `--exit`: 任务执行完毕后自动退出程序。
 
-## 💬 加入我们
-
-*   **QQ 交流群**: `1035795301` (入群答案: `老王同学OK`)
-*   **QQ 频道**: [点击加入](https://pd.qq.com/s/djmm6l44y) (群满或获取最新资讯)
-*   **开发者群**: `926858895` ( **注意**: 此群仅面向有开发能力、希望参与贡献的开发者，入群前请确保您已能够从源码成功运行项目。)
-
-本项目基于 [ok-script](https://github.com/ok-oldking/ok-script) 框架开发，核心代码仅约 3000 行 (Python)，简单易维护。欢迎有兴趣的开发者使用 [ok-script](https://github.com/ok-oldking/ok-script) 开发您自己的自动化项目。
-
 ## 🔗 使用ok-script的项目：
 
 * 鸣潮 [https://github.com/ok-oldking/ok-wuthering-wave](https://github.com/ok-oldking/ok-wuthering-waves)
@@ -250,12 +238,7 @@ python main.py -t 1 -e
 * 白荆回廊(停止更新) [https://github.com/ok-oldking/ok-baijing](https://github.com/ok-oldking/ok-baijing)
 
 
-## ❤️ 赞助与致谢
-
-### 赞助商 (Sponsors)
-*   **EXE 签名**: Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
-
-### 致谢
+## ❤️ 致谢
 *   [lazydog28/mc_auto_boss](https://github.com/lazydog28/mc_auto_boss)
 *   [ok-oldking/OnnxOCR](https://github.com/ok-oldking/OnnxOCR)
 *   [zhiyiYo/PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets)
