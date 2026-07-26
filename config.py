@@ -1,7 +1,7 @@
 import os
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 # WA: set empty PATH to resolve qfluentwidgets/PySide6 access os.environ['PATH'] issue
 if 'PATH' not in os.environ:
@@ -118,7 +118,7 @@ def _find_pc_exe_near_registered_path(registered_path):
 def calculate_pc_exe_path(running_path):
     if running_path is None:
         return _find_most_recently_run_pc_exe() or _find_pc_exe_from_registry()
-    game_exe_folder = Path(running_path).parents[3]
+    game_exe_folder = PureWindowsPath(running_path).parents[3]
     return str(game_exe_folder / "Wuthering Waves.exe")
 
 
