@@ -1,5 +1,6 @@
 ok-script
-onnxocr-ppocrv4==0.0.5
-openvino
+onnxocr-ppocrv5==0.0.18
+onnxruntime; sys_platform == "darwin"
+openvino; sys_platform == "win32"
 opencv-python
 gitpython

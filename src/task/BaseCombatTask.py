@@ -11,7 +11,13 @@ from ok import safe_get
 from src import text_white_color
 from src.char import BaseChar
 from src.char.BaseChar import SwitchPriority, dot_color  # noqa
-from src.char.CharFactory import get_char_by_pos
+from src.char.CharFactory import (
+    CHARACTER_HINT_MATCH_THRESHOLD,
+    char_names,
+    get_char_by_hint,
+    get_char_from_hint,
+    get_char_by_pos,
+)
 from src.combat.CombatCheck import CombatCheck
 from src.task.BaseWWTask import isolate_white_text_to_black, binarize_for_matching
 
@@ -51,6 +57,11 @@ class BaseCombatTask(CombatCheck):
     hot_key_verified = False  # 热键是否已验证
     con_full_size = None  # 不同角色协奏值充满时的大小记录
     freeze_durations = []  # 记录冻结/卡肉的持续时间
+    team_hint = Config("_combat_team_hint", {
+        "0": "",
+        "1": "",
+        "2": "",
+    })
     if con_full_size is None:
         con_full_size = Config("_con_full_size", {
             "0": 0,
@@ -360,8 +371,10 @@ class BaseCombatTask(CombatCheck):
         """
         if wait_combat_time > 0:
             result = self.wait_combat(target=target, time_out=wait_combat_time, raise_if_not_found=raise_if_not_found)
-        self.load_chars()
+        if not self.combat_chars_ready():
+            self.load_chars()
         self.info['Combat Count'] = self.info.get('Combat Count', 0) + 1
+        self.on_combat_started()
         try:
             while self.in_combat():
                 logger.debug(f'combat_once loop {self.chars}')
@@ -374,6 +387,33 @@ class BaseCombatTask(CombatCheck):
         self.switch_healer()
         self.wait_in_team_and_world(time_out=10, raise_if_not_found=False)
         return result
+
+    def on_combat_started(self):
+        """Optional task hook after combat is confirmed and the team is ready."""
+
+    def prefer_fast_character_rotation(self):
+        """Whether character modules should use their shorter farming budget."""
+        return False
+
+    def allow_immediate_visible_liberation(self):
+        """Whether a character may use a visibly ready liberation immediately."""
+        return False
+
+    def preferred_switch_target(self, current_char, candidates, has_intro):
+        """Return a task-scoped rotation target, or None for role scheduling."""
+        return None
+
+    def attack_while_waiting_to_switch(self):
+        """Whether switch retries should weave normal attacks."""
+        return True
+
+    def wait_for_full_con_before_switch(self):
+        """Whether the current character must fill Concerto before switching."""
+        return False
+
+    def use_sparse_con_ring_detection(self):
+        """Whether to support the newer thin, segmented Concerto ring UI."""
+        return False
 
     def run_in_circle_to_find_echo(self, circle_count=3):
         """通过绕圈移动来尝试拾取声骸。
@@ -489,6 +529,14 @@ class BaseCombatTask(CombatCheck):
         if not candidates:
             return current_char
 
+        preferred = self.preferred_switch_target(
+            current_char,
+            candidates,
+            has_intro,
+        )
+        if preferred in candidates:
+            return preferred
+
         must_targets = []
         normal_targets = []
         no_targets = []
@@ -535,7 +583,12 @@ class BaseCombatTask(CombatCheck):
         has_intro = free_intro
         current_con = 0
         self.update_lib_portrait_icon()
-        if not has_intro:
+        if self.wait_for_full_con_before_switch() and free_intro:
+            # Farming uses the live gauge as the source of truth even when a
+            # character module requests a nominally free Intro.
+            current_con = current_char.get_current_con()
+            has_intro = current_con == 1
+        elif not has_intro:
             current_con = current_char.get_current_con()
             if current_con > 0.8 and current_con != 1:
                 logger.info(f'switch_next_char current_con {current_con:.2f} almost full, sleep and check again')
@@ -544,6 +597,38 @@ class BaseCombatTask(CombatCheck):
                 current_con = current_char.get_current_con()
             if current_con == 1:
                 has_intro = True
+
+        if self.wait_for_full_con_before_switch() and not has_intro:
+            logger.info(
+                f'defer switch for {current_char}: Concerto is '
+                f'{current_con:.2f}, waiting for the ring to become full'
+            )
+            current_char.continues_normal_attack(
+                0.35,
+                until_con_full=True,
+            )
+            return
+
+        if self.wait_for_full_con_before_switch():
+            # The thin segmented ring can briefly resemble a full ring during
+            # orange combat effects. Require the next captured frame to agree
+            # before a farming rotation consumes the Outro.
+            self.sleep(0.08)
+            self.next_frame()
+            confirmed_con = self.get_current_con()
+            current_char.current_con = confirmed_con
+            if confirmed_con != 1:
+                logger.info(
+                    f'defer switch for {current_char}: full Concerto was not '
+                    f'confirmed on the next frame ({confirmed_con:.2f})'
+                )
+                current_char.continues_normal_attack(
+                    0.35,
+                    until_con_full=True,
+                )
+                return
+            current_con = confirmed_con
+            has_intro = True
 
         switch_to = self._choose_switch_target(current_char, has_intro, target_low_con=target_low_con)
         if not switch_to or switch_to == current_char:
@@ -560,6 +645,7 @@ class BaseCombatTask(CombatCheck):
         from src.char.ShoreKeeper import ShoreKeeper
         last_click = 0
         start = time.time()
+        team_missing_since = None
         while True:
             if not (isinstance(switch_to, ShoreKeeper) and has_intro):
                 self.check_combat()
@@ -587,23 +673,36 @@ class BaseCombatTask(CombatCheck):
                 self.sleep(0.1)
                 continue
             if now - last_click > 0.1:
-                self.send_key(switch_to.index + 1)
+                switch_key = switch_to.index + 1
+                if last_click == 0:
+                    logger.info(
+                        f'switch_next_char send key {switch_key} for '
+                        f'{switch_to} at team slot {switch_to.index + 1}'
+                    )
+                self.send_key(switch_key)
                 self.sleep(0.001)
                 last_click = now
                 self.log_debug('switch not detected, send click')
-                self.click()
-                self.sleep(0.001)
+                if self.attack_while_waiting_to_switch():
+                    self.click()
+                    self.sleep(0.001)
             in_team, current_index, size = self.in_team()
             if not in_team:
-                logger.info(f'not in team while switching chars_{current_char}_to_{switch_to} {now - start}')
-                # if self.debug:
-                #     self.screenshot(f'not in team while switching chars_{current_char}_to_{switch_to} {now - start}')
-                self.raise_not_in_combat(f'not in_team while switching')
-                if now - start > self.switch_char_time_out:
+                if team_missing_since is None:
+                    team_missing_since = time.time()
+                    logger.info(
+                        f'team UI temporarily missing while switching '
+                        f'chars_{current_char}_to_{switch_to}'
+                    )
+                missing_duration = time.time() - team_missing_since
+                if missing_duration > self.switch_char_time_out:
                     self.raise_not_in_combat(
-                        f'switch too long failed chars_{current_char}_to_{switch_to}, {now - start}')
+                        f'team UI missing too long while switching '
+                        f'chars_{current_char}_to_{switch_to}, '
+                        f'{missing_duration:.3f}s')
                 self.next_frame()
                 continue
+            team_missing_since = None
             if current_index != switch_to.index:
                 if now - start > 10:
                     if self.debug:
@@ -628,9 +727,18 @@ class BaseCombatTask(CombatCheck):
             post_action(switch_to, has_intro)
         logger.info(f'switch_next_char end {(current_char.last_switch_time - start):.3f}s')
 
-    def find_mouse_forte(self):
-        return self.find_one('mouse_forte', horizontal_variance=0.025, vertical_variance=0.015, threshold=0.6,
-                             frame_processor=binarize_for_matching)
+    def find_mouse_forte(self, threshold=0.6):
+        # Character-specific Forte gauges change the horizontal position of
+        # the mouse prompt. Mornye's live 1920x1080 prompt is around x=1090,
+        # roughly 51 px left of the x=1141 template. The former 2.5% search
+        # variance stopped at x=1093 and clipped the true correlation peak.
+        return self.find_one(
+            'mouse_forte',
+            horizontal_variance=0.035,
+            vertical_variance=0.015,
+            threshold=threshold,
+            frame_processor=binarize_for_matching,
+        )
 
     def find_e_forte(self):
         return self.find_one('e_forte', horizontal_variance=0.025, threshold=0.6,
@@ -754,8 +862,8 @@ class BaseCombatTask(CombatCheck):
             scale = 1.2
             if not self.has_short_action():
                 # self.set_key('Resonance Key', self.get_box_by_name('e').scale(scale))
-                self.set_key('Echo Key', self.get_box_by_name('r').scale(scale))
-                self.set_key('Liberation Key', self.get_box_by_name('q').scale(scale))
+                self.set_key('Echo Key', self.get_box_by_name('q').scale(scale))
+                self.set_key('Liberation Key', self.get_box_by_name('r').scale(scale))
                 # self.set_key('Tool Key', self.get_box_by_name('t').scale(scale))
 
             self.info_set('Liberation Key', self.get_liberation_key())
@@ -776,12 +884,11 @@ class BaseCombatTask(CombatCheck):
         if not in_team:
             return
         previous_char_identity = self._char_identity(self.chars)
-        # self.log_info('load chars')
-        self.chars[0] = get_char_by_pos(self, self.get_box_by_name('box_char_1'), 0, safe_get(self.chars, 0))
-        self.chars[1] = get_char_by_pos(self, self.get_box_by_name('box_char_2'), 1, safe_get(self.chars, 1))
+        self.chars[0] = self._load_char_slot(0, 'box_char_1')
+        self.chars[1] = self._load_char_slot(1, 'box_char_2')
 
         if count == 3:
-            new_char = get_char_by_pos(self, self.get_box_by_name('box_char_3'), 2, safe_get(self.chars, 2))
+            new_char = self._load_char_slot(2, 'box_char_3')
             if len(self.chars) == 2:
                 self.chars.append(new_char)
             else:
@@ -800,6 +907,12 @@ class BaseCombatTask(CombatCheck):
                     char.is_current_char = False
         self.combat_start = time.time()
         if len(self.chars) >= 2:
+            for index, char in enumerate(self.chars):
+                if (
+                        char is not None
+                        and char.char_name in char_names
+                        and char.confidence >= CHARACTER_HINT_MATCH_THRESHOLD):
+                    self.team_hint[str(index)] = char.char_name
             if self._char_identity(self.chars) != previous_char_identity:
                 translated_names = []
                 for c in self.chars:
@@ -816,6 +929,89 @@ class BaseCombatTask(CombatCheck):
                 for c in self.chars:
                     self.log_info(f'loaded chars success {c} {c.confidence}')
             return True
+
+    def trust_cached_character_hints(self):
+        """Whether persisted slot hints may short-circuit a full roster scan."""
+        return True
+
+    def preferred_character_hint(self, index):
+        """Return a task-scoped verified slot hint, if one is available."""
+        return ''
+
+    def trust_preferred_character_hints(self):
+        """Whether an explicit task profile is authoritative for its team."""
+        return False
+
+    def _load_char_slot(self, index, box_name):
+        old_char = safe_get(self.chars, index)
+        preferred_hint = self.preferred_character_hint(index)
+        cached_hint = (
+            old_char.char_name
+            if old_char is not None and old_char.char_name in char_names
+            else self.team_hint.get(str(index), '')
+        )
+        box = self.get_box_by_name(box_name)
+        if preferred_hint:
+            preferred_char = get_char_by_hint(
+                self,
+                box,
+                index,
+                preferred_hint,
+                old_char=old_char,
+            )
+            if preferred_char is not None:
+                self.log_info(
+                    f'loaded char slot {index + 1} from farming profile '
+                    f'{preferred_hint}'
+                )
+                return preferred_char
+            self.log_info(
+                f'farming profile character did not match slot {index + 1}: '
+                f'{preferred_hint}'
+            )
+            if self.trust_preferred_character_hints():
+                preferred_char = get_char_from_hint(
+                    self,
+                    index,
+                    preferred_hint,
+                    old_char=old_char,
+                )
+                if preferred_char is not None:
+                    self.log_info(
+                        f'use authoritative farming profile for slot '
+                        f'{index + 1}: {preferred_hint}'
+                    )
+                    return preferred_char
+            self.log_info(
+                f'no authoritative farming profile for slot {index + 1}; '
+                'scan the full roster'
+            )
+
+        if cached_hint and self.trust_cached_character_hints():
+            hinted_char = get_char_by_hint(
+                self,
+                box,
+                index,
+                cached_hint,
+                old_char=old_char,
+            )
+            if hinted_char is not None:
+                self.log_info(
+                    f'loaded char slot {index + 1} from hint {cached_hint}'
+                )
+                return hinted_char
+            self.log_info(
+                f'rejected weak character hint for slot {index + 1}: '
+                f'{cached_hint}; '
+                'scan the full roster'
+            )
+        elif cached_hint and not preferred_hint:
+            self.log_info(
+                f'bypass cached character hint for slot {index + 1}: '
+                f'{cached_hint}; '
+                'scan the live farming team'
+            )
+        return get_char_by_pos(self, box, index, old_char)
 
     @staticmethod
     def _char_identity(chars):
@@ -922,6 +1118,16 @@ class BaseCombatTask(CombatCheck):
                 max_is_full = is_full
             if area > max_area:
                 max_area = int(area)
+            if (
+                    not is_full
+                    and self.use_sparse_con_ring_detection()
+                    and self.is_sparse_con_ring_full(cropped, color_range)
+            ):
+                max_is_full = True
+                logger.info(
+                    f'new segmented Concerto ring detected full for '
+                    f'{self.get_current_char()}'
+                )
         if max_is_full:
             percent = 1
         if max_is_full:
@@ -942,6 +1148,33 @@ class BaseCombatTask(CombatCheck):
         if percent > 1:
             percent = 1
         return percent
+
+    @staticmethod
+    def is_sparse_con_ring_full(image, color_range):
+        """Recognize the newer thin segmented ring by colored-pixel density.
+
+        The former contour test expects one convex connected component. The
+        current UI intentionally breaks the ring at several ticks, so a full
+        1920x1080 Fire ring contains about 26--35 exact-color pixels while a
+        partial ring contains about 13--18. Using a scale-independent annulus
+        density keeps the fallback valid at other resolutions.
+        """
+        lower_bound, upper_bound = color_range_to_bound(color_range)
+        h, w = image.shape[:2]
+        center = (w // 2, h // 2)
+        inner_radius = int(h * 0.35119)
+        outer_radius = int(np.ceil(h * 0.42261))
+        ring_mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.circle(ring_mask, center, outer_radius, 255, -1)
+        cv2.circle(ring_mask, center, inner_radius, 0, -1)
+        colored = cv2.inRange(image, lower_bound, upper_bound)
+        ring_pixels = cv2.countNonZero(ring_mask)
+        if ring_pixels <= 0:
+            return False
+        colored_pixels = cv2.countNonZero(
+            cv2.bitwise_and(colored, ring_mask)
+        )
+        return colored_pixels / ring_pixels >= 0.032
 
     def count_rings(self, image, color_range, min_area):
         """在指定图像区域内计算特定颜色范围的能量环数量和状态。

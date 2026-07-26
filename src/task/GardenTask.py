@@ -1,4 +1,5 @@
 import re
+import sys
 
 from qfluentwidgets import FluentIcon
 
@@ -85,6 +86,12 @@ class GardenTask(WWOneTimeTask, BaseWWTask):
         self.log_info('乐园任务完成, 已达到上限', notify=True)
 
     def open_garden_weekly_page(self):
+        if sys.platform == 'darwin':
+            self.log_error(
+                'the current macOS guidebook navigation is not calibrated for '
+                'GardenTask; stop before running legacy coordinates'
+            )
+            raise Exception('GardenTask guidebook navigation is not calibrated')
         self.openF2Book('gray_book_quest')
         self.sleep(1)
         self.click(0.343, 0.129, after_sleep=1)

@@ -1,9 +1,10 @@
 import math
+import sys
 
-import win32api
 from qfluentwidgets import FluentIcon
 
 from ok import TriggerTask, Logger
+from ok.util.window import get_cursor_position, set_cursor_position
 
 logger = Logger.get_logger(__name__)
 
@@ -12,7 +13,9 @@ class MouseResetTask(TriggerTask):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.default_config = {'_enabled': True}
+        # This workaround targets Windows background-input cursor jumps. Keep
+        # it opt-in on macOS, where the MVP deliberately uses foreground input.
+        self.default_config = {'_enabled': sys.platform == "win32"}
         self.group_name = "Diagnosis"
         self.group_icon = FluentIcon.ROBOT
         self.trigger_interval = 10
@@ -37,7 +40,7 @@ class MouseResetTask(TriggerTask):
         if self.is_browser():
             return
         try:
-            current_position = win32api.GetCursorPos()
+            current_position = get_cursor_position()
             if self.mouse_pos and self.hwnd and self.hwnd.exists and not self.hwnd.visible and self.executor.interaction and self.executor.interaction.capture:
                 center_pos = self.executor.interaction.capture.get_abs_cords(self.width_of_screen(0.5),
                                                                              self.height_of_screen(0.5))
@@ -51,7 +54,7 @@ class MouseResetTask(TriggerTask):
                 )
                 if distance > 200 and close_to_center:
                     logger.info(f'move mouse back {self.mouse_pos}')
-                    win32api.SetCursorPos(self.mouse_pos)
+                    set_cursor_position(self.mouse_pos)
                     self.mouse_pos = self.mouse_pos
                     if self.enabled:
                         self.handler.post(self.mouse_reset, 1)

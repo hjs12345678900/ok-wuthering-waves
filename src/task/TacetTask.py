@@ -58,18 +58,21 @@ class TacetTask(WWOneTimeTask, BaseCombatTask):
         self.info_incr('used stamina', 0)
         while True:
             self.sleep(1)
-            self.openF2Book("gray_book_boss")
+            self.open_materials_book()
             current, back_up, total = self.get_stamina()
-            if current == -1:
-                self.click_relative(0.04, 0.4, after_sleep=1)
-                current, back_up, total = self.get_stamina()
             if total < self.stamina_once:
                 return self.not_enough_stamina()
 
             self.open_boss_book('wuyin')
             index = config.get('Which Tacet Suppression to Farm', 1) - 1
-            self.teleport_to_tacet(index)
-            self.click_team_challenge()
+            if not self.teleport_to_tacet(index):
+                self.log_error(
+                    'no unlocked Tacet Suppression location was found; '
+                    'no other material category was selected'
+                )
+                raise RuntimeError(
+                    'no unlocked Tacet Suppression location was found'
+                )
             while True:
                 self.wait_in_team_and_world(time_out=120)
                 self.combat_once(target=True)
@@ -97,7 +100,65 @@ class TacetTask(WWOneTimeTask, BaseCombatTask):
             self.back(after_sleep=1)
 
     def teleport_to_tacet(self, index):
-        self.info_set('Teleport to Tacet Suppression', index)
-        if index >= self.total_number:
+        if index < 0 or index >= self.total_number:
             raise IndexError(f'Index out of range, max is {self.total_number}')
-        return self.click_on_book_target(index + 1, self.total_number, self.structure)
+
+        catalog = self.build_material_page_dictionary('wuyin')
+        indexed_locations = self.order_material_locations(
+            catalog['locations'],
+            preferred_index=index,
+        )
+        if indexed_locations:
+            self.log_info(
+                'use the current cultivation-target dictionary for '
+                'Tacet Suppression'
+            )
+            for attempt, location in enumerate(indexed_locations):
+                if attempt:
+                    self.open_boss_book('wuyin')
+                    self.log_info(
+                        f"retry the same cultivation target at "
+                        f"{location['name']}"
+                    )
+                self.info_set(
+                    'Teleport to Tacet Suppression',
+                    location['name'],
+                )
+                if self.enter_material_location(location):
+                    return True
+                self.log_info(
+                    f"Tacet Suppression location {location['name']} "
+                    'is unavailable'
+                )
+                if not self.leave_unavailable_domain_page():
+                    raise RuntimeError(
+                        'could not leave unavailable Tacet Suppression '
+                        'location safely'
+                    )
+            return False
+
+        self.log_info(
+            'material location OCR index is empty; use the serial fallback'
+        )
+        candidates = list(range(index, self.total_number))
+        candidates.extend(range(0, index))
+        for attempt, candidate in enumerate(candidates):
+            if attempt:
+                self.open_boss_book('wuyin')
+                self.log_info(
+                    f'retry Tacet Suppression location {candidate + 1}; '
+                    'stay in the same material category'
+                )
+            self.info_set('Teleport to Tacet Suppression', candidate)
+            if self.enter_book_domain_target(
+                    candidate + 1, self.total_number, self.structure):
+                return True
+
+            self.log_info(
+                f'Tacet Suppression location {candidate + 1} is unavailable'
+            )
+            if not self.leave_unavailable_domain_page():
+                raise RuntimeError(
+                    'could not leave unavailable Tacet Suppression location safely'
+                )
+        return False

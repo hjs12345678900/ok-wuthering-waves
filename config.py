@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 from pathlib import Path
 
 # WA: set empty PATH to resolve qfluentwidgets/PySide6 access os.environ['PATH'] issue
@@ -63,8 +64,8 @@ config = {
         'lib': 'onnxocr',
         'auto_simplify': True,
         'params': {
-            'use_openvino': True,
-            'use_npu': True,
+            'use_openvino': sys.platform == "win32",
+            'use_npu': sys.platform == "win32",
         }
     },
     'my_app': ['src.globals', 'Globals'],
@@ -94,6 +95,14 @@ config = {
         'force_no_hdr': False,
         'check_night_light': True,
         'force_no_night_light': False,
+    },
+    'macos': {
+        # Match the native game directly. Titles and owner names are localized
+        # and may contain whitespace, while the bundle identifier is stable.
+        'bundle_id': 'com.kurogame.wutheringwaves.global',
+        'interaction': 'MacForeground',
+        'capture_method': ['ScreenCaptureKit'],
+        'fps': 30,
     },
     'window_size': {
         'width': 1200,
@@ -145,6 +154,7 @@ config = {
     'version': version,
     'onetime_tasks': [  # tasks to execute
         ["src.task.DailyTask", "DailyTask"],
+        ["src.task.CharacterMaterialTask", "CharacterMaterialTask"],
         ["src.task.MultiAccountDailyTask", "MultiAccountDailyTask"],
         ["src.task.FarmEchoTask", "FarmEchoTask"],
         ["src.task.AutoRogueTask", "AutoRogueTask"],

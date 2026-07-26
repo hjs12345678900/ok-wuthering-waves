@@ -85,19 +85,84 @@
 
 ## 💻 开发者专区
 
-### 从源码运行 (Python)
+### 普通用户安装（Windows）
 
-本项目仅支持 Python 3.12 版本。
+普通用户建议直接从[官方 Releases](https://github.com/ok-oldking/ok-wuthering-waves/releases)下载最新的 `setup.exe`，不要下载 GitHub 自动生成的 Source Code 压缩包。安装完成后从桌面快捷方式或开始菜单启动。
+
+### 从源码运行（Windows / macOS）
+
+源码开发环境推荐且仅测试 **Python 3.12**。请先安装 Git 和 Python 3.12，然后执行：
 
 ```bash
-# 安装或更新依赖
-pip install -r requirements.txt --upgrade
+# 1. 克隆项目
+git clone https://github.com/ok-oldking/ok-wuthering-waves.git
+cd ok-wuthering-waves
 
-# 运行 Release 版本
+# 2. 创建虚拟环境
+python3.12 -m venv .venv
+
+# macOS
+source .venv/bin/activate
+
+# Windows PowerShell（与上一条二选一）
+.\.venv\Scripts\Activate.ps1
+
+# 3. 安装依赖
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+# 4. 启动程序
 python main.py
 
-# 运行 Debug 版本
+# 或启动 Debug 版本
 python main_debug.py
+```
+
+#### 同时开发本地 `ok-script`
+
+本项目依赖 `ok-script`。普通安装会使用 `requirements.txt` 中固定的正式版本；如果需要验证尚未发布的框架修改（例如本仓库配套的 macOS 后端），请将两个仓库放在同一父目录，并把本地框架以 editable 模式安装到同一虚拟环境：
+
+```text
+Games/
+├── ok-script/
+└── ok-wuthering-waves/
+```
+
+```bash
+cd ok-wuthering-waves
+source .venv/bin/activate  # Windows 使用 .\.venv\Scripts\Activate.ps1
+python -m pip uninstall -y ok-script
+python -m pip install -e ../ok-script
+python main_debug.py
+```
+
+可用以下命令确认程序实际加载的是本地仓库：
+
+```bash
+python -c "import ok; print(ok.__file__)"
+```
+
+输出路径应指向相邻的 `ok-script/ok` 目录。
+
+#### macOS 额外要求
+
+- 需要 macOS 12 或更高版本、Apple Silicon Mac，以及原生《鸣潮》客户端。
+- 安装 Xcode Command Line Tools；开发模式首次运行会使用 `swiftc` 编译 ScreenCaptureKit 辅助程序。
+- 在“系统设置 → 隐私与安全性”中，为启动程序的终端或应用开启“屏幕与系统音频录制”和“辅助功能”，然后完全重启该终端或应用。
+- 建议先运行权限与窗口探针：
+
+```bash
+python scripts/macos_probe.py --prompt-permissions
+python scripts/macos_probe.py --snapshot /tmp/ok-ww-macos.png
+```
+
+macOS 支持目前仍属于实验性 MVP：输入仅在游戏位于前台时发送，不承诺最小化或后台运行；首次使用请优先测试截图、窗口识别和低风险任务。详细设计与已知限制见 [`docs/macos-port-plan.md`](docs/macos-port-plan.md) 和 [`docs/macos-pitfalls-2026-07-25.md`](docs/macos-pitfalls-2026-07-25.md)。
+
+#### 开发验证
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest
 ```
 
 ### 命令行参数

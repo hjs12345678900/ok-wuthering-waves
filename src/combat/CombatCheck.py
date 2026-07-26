@@ -1,10 +1,9 @@
 import re
 import time
 
-import win32api
-
 from ok import find_boxes_by_name, Logger, calculate_color_percentage
 from ok import find_color_rectangles, get_mask_in_color_range, is_pure_black
+from ok.util.window import get_cursor_position, set_cursor_position
 from src import text_white_color
 from src.Labels import Labels
 from src.char.Roccia import Roccia
@@ -37,6 +36,11 @@ class CombatCheck(BaseWWTask):
         self.combat_end_condition = None
         self.has_lavitator = False
         self.target_enemy_error_notified = False
+        self.targetless_combat_notified = False
+        self.last_targetless_target_attempt = 0
+        self.last_targetless_health_probe = 0
+        self.last_targetless_health_confirmed = 0
+        self.last_targetless_end_probe = 0
         self.cds = {
         }
         self.esc_count = 0
@@ -75,8 +79,91 @@ class CombatCheck(BaseWWTask):
         self.last_in_realm_not_combat = 0
         self.has_lavitator = False
         self.can_break = False
+        self.targetless_combat_notified = False
+        self.last_targetless_target_attempt = 0
+        self.last_targetless_health_probe = 0
+        self.last_targetless_health_confirmed = 0
+        self.last_targetless_end_probe = 0
         self.scene.set_not_in_combat()
         return False
+
+    def allow_combat_without_target(self):
+        """Whether a confirmed enemy health bar is enough to keep fighting.
+
+        Open-world auto combat still requires the lock-on indicator to avoid
+        attacking unrelated enemies. Scripted domains can override this
+        because the task has already deliberately started the encounter.
+        """
+        return False
+
+    def combat_chars_ready(self):
+        """Whether the task already identified its team before combat."""
+        return False
+
+    def targetless_health_probe_interval(self):
+        return 0
+
+    def targetless_combat_grace_period(self):
+        return 0
+
+    def targetless_target_retry_interval(self):
+        return 0.5
+
+    def targetless_end_probe_interval(self):
+        return 0
+
+    def targetless_end_condition_reached(self):
+        if self.combat_end_condition is None:
+            return False
+        now = time.time()
+        if (
+                self.last_targetless_end_probe > 0
+                and now - self.last_targetless_end_probe
+                < self.targetless_end_probe_interval()):
+            return False
+        self.last_targetless_end_probe = now
+        return bool(self.combat_end_condition())
+
+    def keep_targetless_combat(self, health_bar_confirmed=False):
+        """Keep a scripted encounter active while lock-on is unavailable.
+
+        A task may provide a short grace period so character action loops do
+        not rerun expensive image recognition for every attack. The health bar
+        is still sampled periodically, and combat ends once the last positive
+        sample ages beyond that grace period.
+        """
+        if not self.allow_combat_without_target():
+            return False
+        now = time.time()
+        if health_bar_confirmed:
+            self.last_targetless_health_probe = now
+            self.last_targetless_health_confirmed = now
+        elif (
+                self.last_targetless_health_confirmed == 0
+                or now - self.last_targetless_health_probe
+                >= self.targetless_health_probe_interval()):
+            self.last_targetless_health_probe = now
+            if self.check_health_bar():
+                self.last_targetless_health_confirmed = now
+
+        if (
+                self.last_targetless_health_confirmed == 0
+                or now - self.last_targetless_health_confirmed
+                > self.targetless_combat_grace_period()):
+            return False
+
+        if (
+                now - self.last_targetless_target_attempt
+                >= self.targetless_target_retry_interval()):
+            self.last_targetless_target_attempt = now
+            self.target_enemy(wait=False)
+        if not self.targetless_combat_notified:
+            self.targetless_combat_notified = True
+            self.log_info(
+                'enemy health bar confirmed without lock-on; '
+                'continue combat and retry target in background'
+            )
+        return self.scene.set_in_combat()
 
     def check_f_break(self):
         if not self.can_break and not self._in_liberation and time.time() - self.last_break_check_time > 1:
@@ -136,6 +223,17 @@ class CombatCheck(BaseWWTask):
         if self._in_combat:
             if self.scene.in_combat() is not None:
                 return self.scene.in_combat()
+            if self.targetless_combat_notified:
+                if self.targetless_end_condition_reached():
+                    return self.reset_to_false(
+                        reason='targetless combat end condition reached'
+                    )
+                if self.keep_targetless_combat():
+                    return True
+                logger.info('targetless combat health-bar grace expired')
+                return self.reset_to_false(
+                    reason='targetless enemy health bar disappeared'
+                )
             self.check_f_break()
             if current_char := self.get_current_char():
                 if current_char.skip_combat_check():
@@ -145,11 +243,15 @@ class CombatCheck(BaseWWTask):
                 return self.reset_to_false(reason='on_combat_check failed')
             if self.has_target():
                 self.last_in_realm_not_combat = 0
+                self.targetless_combat_notified = False
                 return self.scene.set_in_combat()
             if self.combat_end_condition is not None and self.combat_end_condition():
                 return self.reset_to_false(reason='end condition reached')
+            if self.keep_targetless_combat():
+                return True
             if self.target_enemy(wait=True):
                 logger.debug(f'retarget enemy succeeded')
+                self.targetless_combat_notified = False
                 return self.scene.set_in_combat()
             if self.should_check_monthly_card() and self.handle_monthly_card():
                 return self.scene.set_in_combat()
@@ -157,20 +259,32 @@ class CombatCheck(BaseWWTask):
             return self.reset_to_false(reason='target enemy failed')
         else:
             from src.task.AutoCombatTask import AutoCombatTask
-            chars_loaded = self.load_chars()
+            chars_loaded = self.combat_chars_ready() or self.load_chars()
             has_target = self.has_target()
             if not has_target and target:
                 self.log_debug('try target')
                 self.middle_click(after_sleep=0.1)
-            in_combat = has_target or ((self.config.get('Auto Target') or not isinstance(self,
-                                                                                         AutoCombatTask)) and self.check_health_bar())
+            health_bar_confirmed = (
+                not has_target
+                and (
+                    self.config.get('Auto Target')
+                    or not isinstance(self, AutoCombatTask)
+                )
+                and self.check_health_bar()
+            )
+            in_combat = has_target or health_bar_confirmed
             if in_combat:
-                if not has_target and not self.target_enemy(wait=True):
-                    if not self.target_enemy_error_notified:
-                        self.target_enemy_error_notified = True
-                        self.log_error('Target enemy failed, please disable Nvidia/AMD Filter or Sharpening!',
-                                       notify=True)
-                    return False
+                if not has_target:
+                    if not self.keep_targetless_combat(
+                            health_bar_confirmed=health_bar_confirmed
+                    ) and not self.target_enemy(wait=True):
+                        if not self.target_enemy_error_notified:
+                            self.target_enemy_error_notified = True
+                            self.log_error('Target enemy failed, please disable Nvidia/AMD Filter or Sharpening!',
+                                           notify=True)
+                        return False
+                else:
+                    self.targetless_combat_notified = False
                 self.has_lavitator = self.find_one('edge_levitator', threshold=0.65)
                 self.log_info(f'enter combat {self.has_lavitator}')
                 self._in_combat = chars_loaded or self.load_chars()
@@ -214,14 +328,14 @@ class CombatCheck(BaseWWTask):
         if not levitator:
             self.send_key_up(self.key_config.get('Wheel Key'))
             raise Exception('no levitator tool in the tab wheel!')
-        old = win32api.GetCursorPos()
+        old = get_cursor_position()
         self.move(levitator.x, levitator.y)
         abs_pos = self.executor.interaction.capture.get_abs_cords(levitator.x, levitator.y)
-        win32api.SetCursorPos(abs_pos)
+        set_cursor_position(abs_pos)
         self.sleep(0.1)
         self.send_key_up(self.key_config.get('Wheel Key'))
         self.sleep(0.2)
-        win32api.SetCursorPos(old)
+        set_cursor_position(old)
         if not self.wait_feature('edge_levitator', threshold=0.6, time_out=1):
             if self.has_char(Roccia):
                 if self.find_one('levitator_roccia', threshold=0.6):

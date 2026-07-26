@@ -26,6 +26,7 @@ class AutoPickTask(TriggerTask, BaseWWTask):
     def send_fs(self):
         # if self.debug:
         #     self.screenshot('pick_up', show_box=True)
+        logger.info("pickup prompt detected, sending F")
         self.send_key('f')
         self.sleep(0.2)
         self.send_key('f')

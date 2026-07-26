@@ -140,6 +140,7 @@ for keys, value in _char_dict_raw.items():
         char_dict[key] = value
 
 char_names = char_dict.keys()
+CHARACTER_HINT_MATCH_THRESHOLD = 0.78
 
 
 def _get_char_type(task, info):
@@ -160,11 +161,73 @@ def _apply_char_config(task, char, info):
     return char
 
 
-def _find_registered_char(task, box, info):
+def _find_registered_char(task, box, info, threshold=0.6):
     template_names = info['template_names']
     if len(template_names) == 1:
-        return task.find_one(template_names[0], box=box, threshold=0.6)
-    return task.find_best_match_in_box(box, template_names, threshold=0.6)
+        return task.find_one(
+            template_names[0],
+            box=box,
+            threshold=threshold,
+        )
+    return task.find_best_match_in_box(
+        box,
+        template_names,
+        threshold=threshold,
+    )
+
+
+def get_char_by_hint(task, box, index, char_name, old_char=None):
+    """Verify one cached character template before scanning the full roster."""
+    info = char_dict.get(char_name)
+    if not info:
+        return None
+    match = _find_registered_char(
+        task,
+        box,
+        info,
+        threshold=CHARACTER_HINT_MATCH_THRESHOLD,
+    )
+    if (
+            not match
+            or match.confidence < CHARACTER_HINT_MATCH_THRESHOLD):
+        return None
+    return get_char_from_hint(
+        task,
+        index,
+        char_name,
+        old_char=old_char,
+        confidence=match.confidence,
+    )
+
+
+def get_char_from_hint(
+        task,
+        index,
+        char_name,
+        old_char=None,
+        confidence=CHARACTER_HINT_MATCH_THRESHOLD,
+):
+    """Build a registered character from an explicit task-scoped team profile."""
+    info = char_dict.get(char_name)
+    if not info:
+        return None
+    cls = load_custom_char_class(info.get('cls'))
+    if old_char is not None and type(old_char) is cls:
+        old_char.confidence = confidence
+        return _apply_char_config(task, old_char, info)
+    return _apply_char_config(
+        task,
+        cls(
+            task,
+            index,
+            char_name=info['canonical_name'],
+            confidence=confidence,
+            ring_index=info.get('ring_index', -1),
+            char_type=_get_char_type(task, info),
+            buff_time=_get_buff_time(task, info),
+        ),
+        info,
+    )
 
 
 def get_char_by_pos(task, box, index, old_char):
@@ -173,18 +236,9 @@ def get_char_by_pos(task, box, index, old_char):
     name = "unknown"
     char = None
     if old_char and old_char.confidence > 0.92 and old_char.char_name in char_names:
-        info = char_dict.get(old_char.char_name)
-        char = _find_registered_char(task, box, info)
-        if char:
-            cls = load_custom_char_class(info.get('cls'))
-            if type(old_char) is not cls:
-                return _apply_char_config(task, cls(task, index, char_name=info['canonical_name'],
-                                                    confidence=char.confidence,
-                                                    ring_index=info.get('ring_index', -1),
-                                                    char_type=_get_char_type(task, info),
-                                                    buff_time=_get_buff_time(task, info)), info)
-            _apply_char_config(task, old_char, info)
-            return old_char
+        if hinted_char := get_char_by_hint(
+                task, box, index, old_char.char_name, old_char=old_char):
+            return hinted_char
     if not char:
         char = task.find_best_match_in_box(box, char_names, threshold=0.6)
         if char:

@@ -3,12 +3,35 @@ import time
 from src.char.BaseChar import BaseChar, SwitchPriority
 
 
+aemeath_mecha_forte_color = {
+    'r': (0, 229),
+    'g': (200, 255),
+    'b': (220, 255),
+}
+
+
 class Aemeath(BaseChar):
     LIBERATION_COOLDOWN = 25
     LIBERATION_FORCE_DURATION = 30
     LIB2_PREPARE_WINDOW = 8
     INTRO_LIBERATION_DELAY = 14
+    LIB2_GUARD_TIME_OUT = 13
+    FAST_LIB2_GUARD_TIME_OUT = 5
+    LIB1_FALLBACK_TIME_OUT = 10
+    FAST_LIB1_FALLBACK_TIME_OUT = 1.5
     POST_LIB2_COMBO_TIME_OUT = 1.5  # lib2 收尾连招(3A+E)的硬时间上限(秒), 防卡死/异常
+    ENHANCED_E_MATCH_THRESHOLD = 0.60
+    ENHANCED_E_HORIZONTAL_VARIANCE = 0.025
+    ENHANCED_E_VERTICAL_VARIANCE = 0.025
+    ENHANCED_E_RETRY_INTERVAL = 0.45
+    OPENING_NORMAL_ATTACKS = 4
+    OPENING_NORMAL_ATTACK_INTERVAL = 0.12
+    HEAVY_RETRY_INTERVAL = 2.0
+    POST_HEAVY_RECOVERY = 0.3
+    POST_HEAVY_NORMAL_ATTACKS = 4
+    POST_HEAVY_NORMAL_ATTACK_INTERVAL = 0.15
+    HUMAN_HEAVY_MATCH_THRESHOLD = 0.60
+    MECHA_FORTE_READY_PERCENT = 0.075
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -18,8 +41,13 @@ class Aemeath(BaseChar):
         self.last_enhance_e = -1
         self.intro_liberation_time = -1
         self.pending_lib2 = False
+        self.last_heavy_attempt = -1
         self._lib1_cast_count = 0   # 本轮 lib1 释放次数
         self._lib2_cast_count = 0   # 本轮 lib2 释放次数
+
+    def reset_state(self):
+        super().reset_state()
+        self.last_heavy_attempt = -1
 
     def lib2_cooldown_anchor(self):
         if self.last_liber >= 0:
@@ -61,7 +89,17 @@ class Aemeath(BaseChar):
                 self.time_elapsed_accounting_for_freeze(anchor) >= self.LIBERATION_FORCE_DURATION)
 
     def can_cast_lib1(self):
-        return self.liberation_cooldown_left() <= 0 and self.lib1_unlocked()
+        if self.liberation_cooldown_left() > 0:
+            return False
+        allow_immediate = getattr(
+            self.task,
+            'allow_immediate_visible_liberation',
+            None,
+        )
+        return (
+            callable(allow_immediate)
+            and allow_immediate()
+        ) or self.lib1_unlocked()
 
     def can_cast_liberation(self):
         return self.can_cast_lib1()
@@ -106,18 +144,27 @@ class Aemeath(BaseChar):
     def _execute_lib2_guard(self, context_log: str = "") -> None:
         """
         进入等待循环以确保第二次解放（lib2）被释放。
-        包含 13 秒的超时保护机制，防止长时间死循环。
+        普通战斗保留 13 秒保护；材料本使用 5 秒快速预算。
         """
         lib2_guard_start = time.time()
+        time_out = self.rotation_timeout(
+            self.LIB2_GUARD_TIME_OUT,
+            self.FAST_LIB2_GUARD_TIME_OUT,
+        )
         self.logger.info(f'Aemeath [do_perform] waiting for lib2 before switching {context_log}')
         
         while not self._lib2_cast_this_turn():
-            # 超时保护（13秒），防止 lib2 长时间不就绪导致死循环
-            if time.time() - lib2_guard_start > 13:
-                self.logger.warning(f'Aemeath [do_perform] lib2 guard timed out (13s) {context_log}, casting switch')
+            if time.time() - lib2_guard_start > time_out:
+                self.logger.warning(
+                    f'Aemeath [do_perform] lib2 guard timed out '
+                    f'({time_out:g}s) {context_log}, casting switch'
+                )
                 break
                 
             self.check_combat()
+            if self.cast_enhanced_e_if_ready():
+                self.task.next_frame()
+                continue
             if self.handle_heavy():
                 self.logger.debug(f'Aemeath [do_perform] handle_heavy triggered during lib2 guard {context_log}')
                 self.task.next_frame()
@@ -128,36 +175,34 @@ class Aemeath(BaseChar):
                     self.logger.debug(f'Aemeath [do_perform] lib2 cast, integrity guard satisfied {context_log}')
                     break
                     
-            if self.enhance_e_available():
-                self.click_resonance(has_animation=True, send_click=True,
-                                     animation_min_duration=0.5, time_out=1.5)
             self.click(after_sleep=0.01)
             self.task.next_frame()
 
     def _execute_lib1_or_fallback_guard(self) -> None:
         """
         处理本轮尚未释放任何解放（lib1）的情况。
-        在 8 秒窗口内尝试释放 lib1 或共鸣技能。如果成功释放 lib1，则级联调用 lib2 守护。
+        在有界窗口内尝试释放 lib1 或共鸣技能。如果成功释放
+        lib1，则级联调用 lib2 守护。
         """
         lib_guard_start = time.time()
         found_action = False
 
-        while time.time() - lib_guard_start < 10.0:
+        time_out = self.rotation_timeout(
+            self.LIB1_FALLBACK_TIME_OUT,
+            self.FAST_LIB1_FALLBACK_TIME_OUT,
+        )
+        while time.time() - lib_guard_start < time_out:
             self.check_combat()
-            
-            if self.liberation_available() and self.can_cast_lib1():
+
+            if self.cast_enhanced_e_if_ready():
+                found_action = True
+                break
+            elif self.liberation_available() and self.can_cast_lib1():
                 self.logger.debug('Aemeath [do_perform] lib available but not cast — casting lib1')
                 self.lib()
                 found_action = True 
                 # 成功释放 lib1 后，直接复用 lib2 的等待逻辑
                 self._execute_lib2_guard(context_log="(after forced lib1)")
-                break
-                
-            elif self.enhance_e_available():
-                self.logger.info('Aemeath [do_perform] resonance available but not cast — casting resonance')
-                self.click_resonance(has_animation=True, send_click=True,
-                                     animation_min_duration=0.5, time_out=1.5)
-                found_action = True
                 break
                 
             else:
@@ -167,7 +212,8 @@ class Aemeath(BaseChar):
 
         if not found_action:
             self.logger.warning(
-                'Aemeath [do_perform] 8s window elapsed with no available skill, '
+                f'Aemeath [do_perform] {time_out:g}s window elapsed with no '
+                'available skill, '
                 'allowing switch without liberation'
             )
 
@@ -228,7 +274,8 @@ class Aemeath(BaseChar):
                 self.intro_time = 14
             if self.check_outro() == 'chang_changli':
                 self.intro_time = 10
-                
+
+        self.opening_normal_attack_burst()
         self.perform_everything()
 
         # 处理回合末尾的技能链（lib1 -> lib2）的完整性约束
@@ -261,34 +308,27 @@ class Aemeath(BaseChar):
         while self.time_elapsed_accounting_for_freeze(start) < 1.2 or (
                 self.should_wait and self.time_elapsed_accounting_for_freeze(start) < 3.6):
             self.cycle_start()
+            if self.cast_enhanced_e_if_ready():
+                start = time.time()
+                self.task.next_frame()
+                continue
+            # Keep the basic string moving before the remaining visual/CD
+            # checks. Those checks are useful but comparatively expensive on
+            # macOS, and must not create a visible pause between attacks.
+            self.click(after_sleep=0.03)
             if self.handle_heavy():
                 self.f_break()
                 start = time.time()
                 self.should_wait = self.should_wait_for_lib2()
                 self.task.next_frame()
                 continue
-            if self.intro_lib1_ready() and self.lib():
+            if self.can_cast_lib1() and self.lib():
                 start = time.time()
                 self.should_wait = self.should_wait_for_lib2()
-            elif self.enhance_e_available():
-                if self.click_resonance(has_animation=True, send_click=True, animation_min_duration=0.5,
-                                        time_out=1.5)[0]:
-                    self.record_enhance_e()
-                    self.click_echo(time_out=0)
-                    self.f_break()
-                    self.task.next_frame()
-                if (
-                        self.intro_lib1_ready() and self.can_cast_lib1() and self.liberation_available()) or self.has_long_action():
-                    start = time.time()
-                else:
-                    self.click(after_sleep=0.01)
-                    return
             elif self.lib():
                 start = time.time()
                 self.should_wait = self.should_wait_for_lib2()
                 continue
-            else:
-                self.click()
             self.cycle_sleep()
 
     def lib_cd_eminent(self):
@@ -296,26 +336,134 @@ class Aemeath(BaseChar):
         return self.lib1_unlocked() and (0 < cd < 1.5 or self.liberation_available())
 
     def enhance_e_available(self):
-        return self.task.find_one('aemeath_e1', threshold=0.7) or self.task.find_one('aemeath_e2',
-                                                                                     threshold=0.7)
+        if (
+                self.last_enhance_e >= 0
+                and self.time_elapsed_accounting_for_freeze(
+                    self.last_enhance_e
+                ) < self.ENHANCED_E_RETRY_INTERVAL):
+            return False
+        return self.task.find_one(
+            'aemeath_e1',
+            threshold=self.ENHANCED_E_MATCH_THRESHOLD,
+            horizontal_variance=self.ENHANCED_E_HORIZONTAL_VARIANCE,
+            vertical_variance=self.ENHANCED_E_VERTICAL_VARIANCE,
+        ) or self.task.find_one(
+            'aemeath_e2',
+            threshold=self.ENHANCED_E_MATCH_THRESHOLD,
+            horizontal_variance=self.ENHANCED_E_HORIZONTAL_VARIANCE,
+            vertical_variance=self.ENHANCED_E_VERTICAL_VARIANCE,
+        )
+
+    def cast_enhanced_e_if_ready(self):
+        """Press E immediately when either enhanced-E icon is visible."""
+        match = self.enhance_e_available()
+        if not match:
+            return False
+        match_name = getattr(match, 'name', 'enhanced-E')
+        confidence = getattr(match, 'confidence', None)
+        match_detail = (
+            f' ({match_name}, confidence={confidence:.3f})'
+            if isinstance(confidence, (int, float))
+            else ''
+        )
+        self.logger.info(
+            'Aemeath enhanced E visible'
+            f'{match_detail}: press resonance immediately'
+        )
+        self.send_resonance_key(post_sleep=0.12)
+        self.record_enhance_e()
+        return True
+
+    def opening_normal_attack_burst(self):
+        """Start generating enhanced E without waiting for visual decisions."""
+        self.logger.info(
+            f'Aemeath opening: {self.OPENING_NORMAL_ATTACKS} immediate '
+            'normal attacks'
+        )
+        for _ in range(self.OPENING_NORMAL_ATTACKS):
+            self.check_combat()
+            self.click(after_sleep=self.OPENING_NORMAL_ATTACK_INTERVAL)
+
+    def post_heavy_normal_attack_burst(self):
+        """Resume the basic string after a heavy instead of re-holding it."""
+        self.logger.info(
+            f'Aemeath heavy follow-up: '
+            f'{self.POST_HEAVY_NORMAL_ATTACKS} normal attacks'
+        )
+        self.sleep(self.POST_HEAVY_RECOVERY)
+        for _ in range(self.POST_HEAVY_NORMAL_ATTACKS):
+            self.check_combat()
+            self.click(
+                after_sleep=self.POST_HEAVY_NORMAL_ATTACK_INTERVAL,
+            )
 
     def heavy_wait_highlight_down(self):
         self.task.mouse_down()
-        ret = self.task.wait_until(lambda: not self.has_long_action(), time_out=1.2)
+        ret = self.task.wait_until(
+            lambda: not self.heavy_ready_state(),
+            time_out=1.2,
+        )
         self.task.mouse_up()
         self.sleep(0.01)
         return ret
 
+    def heavy_ready_state(self):
+        """Return the actual Aemeath heavy state instead of a target proxy."""
+        human_heavy = self.task.find_one(
+            'aemeath_human_heavy',
+            threshold=self.HUMAN_HEAVY_MATCH_THRESHOLD,
+            horizontal_variance=0.025,
+            vertical_variance=0.025,
+        )
+        if human_heavy:
+            return 'human'
+
+        # The mecha form uses a different attack icon. Its reliable signal is
+        # the cyan fill across the left half of Aemeath's Forte gauge.
+        box = self.task.box_of_screen_scaled(
+            3840,
+            2160,
+            1610,
+            1964,
+            1790,
+            2016,
+            name='aemeath_mecha_forte',
+            hcenter=True,
+        )
+        cyan_percent = self.task.calculate_color_percentage(
+            aemeath_mecha_forte_color,
+            box,
+        )
+        if cyan_percent > self.MECHA_FORTE_READY_PERCENT:
+            return 'mecha'
+        return ''
+
     def handle_heavy(self):
-        if not self.has_long_action():
+        if (
+                self.time_elapsed_accounting_for_freeze(
+                    self.last_heavy_attempt
+                ) < self.HEAVY_RETRY_INTERVAL
+        ):
             return False
+        heavy_state = self.heavy_ready_state()
+        if not heavy_state:
+            return False
+        self.logger.info(
+            f'Aemeath {heavy_state} heavy ready: hold normal attack'
+        )
         prepares_lib2 = self.preparing_lib2()
-        if self.heavy_wait_highlight_down():
+        state_cleared = self.heavy_wait_highlight_down()
+        self.last_heavy_attempt = time.time()
+        if state_cleared:
             if prepares_lib2:
                 self.record_heavy_liberation()
-            return True
-        return False
-
+        else:
+            self.logger.info(
+                'Aemeath heavy signal stayed highlighted after release; '
+                'continue with the basic string instead of holding again'
+            )
+        self.post_heavy_normal_attack_burst()
+        return True
     def get_switch_priority(self, current_char=None, has_intro=False, target_low_con=False):
         if self.should_wait_for_lib2():
             # Mornye 离场且队里有 Linnai 时让位: Linnai 要吃 Mornye 协奏入场, 优先级最高, Aemeath 此刻

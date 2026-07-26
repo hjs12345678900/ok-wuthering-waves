@@ -154,7 +154,7 @@ class NightmareNestTask(WWOneTimeTask, BaseCombatTask):
                 return feature
 
     def get_nest_to_go(self):
-        self.openF2Book("gray_book_boss")
+        self.open_materials_book()
 
         while self.queues:
             self.queues[0]()

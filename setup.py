@@ -47,9 +47,10 @@ setuptools.setup(
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Operating System :: Microsoft :: Windows",
+        "Operating System :: MacOS :: MacOS X",
     ],
     install_requires=[
-        'pywin32>=306',
+        'pywin32>=306; sys_platform == "win32"',
         'darkdetect>=0.8.0',
         'PySideSix-Frameless-Window>=0.4.3',
         'typing-extensions>=4.11.0',
