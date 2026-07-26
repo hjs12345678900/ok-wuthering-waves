@@ -46,6 +46,49 @@ class ForgeryTask(DomainTask):
 
         self.farm_domain_with_recovery_loop(must_use, teleport_once)
 
+    @staticmethod
+    def same_material_candidates(serial_number, structure):
+        """Return the same material slot in its paired region pages.
+
+        Forgery pages 1/2 share one set of five materials, while pages 3/4
+        share the newer set. Crossing between those pairs would change the
+        material even when the row position is the same.
+        """
+        total_number = sum(structure)
+        if serial_number < 1 or serial_number > total_number:
+            raise IndexError(f'Index out of range, max is {total_number}')
+
+        group_start = 1
+        selected_group = None
+        material_slot = None
+        for group_index, group_size in enumerate(structure):
+            if serial_number < group_start + group_size:
+                selected_group = group_index
+                material_slot = serial_number - group_start
+                break
+            group_start += group_size
+
+        paired_groups = []
+        for first_group in range(0, len(structure), 2):
+            pair = list(range(first_group, min(first_group + 2, len(structure))))
+            if selected_group in pair:
+                paired_groups = pair
+                break
+
+        candidates = []
+        ordered_groups = [selected_group]
+        ordered_groups.extend(
+            group_index
+            for group_index in paired_groups
+            if group_index != selected_group
+        )
+        for group_index in ordered_groups:
+            if material_slot >= structure[group_index]:
+                continue
+            candidate = 1 + sum(structure[:group_index]) + material_slot
+            candidates.append(candidate)
+        return candidates
+
     def purification_material(self):
         self.send_key("esc")
         self.sleep(1)
@@ -61,14 +104,28 @@ class ForgeryTask(DomainTask):
         self.ensure_main()
 
     def teleport_into_domain(self, serial_number, daily=False):
-        self.open_boss_book('ningsu')
-        self.info_set('Teleport to Forgery Challenge', serial_number - 1)
-        if serial_number > self.total_number:
-            raise IndexError(f'Index out of range, max is {self.total_number}')
-        self.click_on_book_target(serial_number, self.total_number, self.structure)
-        self.click(0.891, 0.910, after_sleep=1)
-        self.click_team_challenge()
-        self.wait_in_team_and_world(time_out=self.teleport_timeout)
+        candidates = self.same_material_candidates(serial_number, self.structure)
+        for attempt, candidate in enumerate(candidates):
+            if attempt:
+                self.log_info(
+                    f'retry the same Forgery material at location {candidate}'
+                )
+            self.open_boss_book('ningsu')
+            self.info_set('Teleport to Forgery Challenge', candidate - 1)
+            if self.enter_book_domain_target(
+                    candidate, self.total_number, self.structure):
+                return
+
+            self.log_info(
+                f'Forgery location {candidate} is unavailable; '
+                'do not switch material'
+            )
+            if not self.leave_unavailable_domain_page():
+                raise RuntimeError('could not leave unavailable Forgery location safely')
+
+        raise RuntimeError(
+            f'no unlocked Forgery location found for the material selected by entry {serial_number}'
+        )
 
     def get_material_mat(self):
         min_width = self.width_of_screen(80 / 2560)

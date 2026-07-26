@@ -1,6 +1,7 @@
 import os
 import re
-from pathlib import Path
+import sys
+from pathlib import Path, PureWindowsPath
 
 # WA: set empty PATH to resolve qfluentwidgets/PySide6 access os.environ['PATH'] issue
 if 'PATH' not in os.environ:
@@ -117,7 +118,7 @@ def _find_pc_exe_near_registered_path(registered_path):
 def calculate_pc_exe_path(running_path):
     if running_path is None:
         return _find_most_recently_run_pc_exe() or _find_pc_exe_from_registry()
-    game_exe_folder = Path(running_path).parents[3]
+    game_exe_folder = PureWindowsPath(running_path).parents[3]
     return str(game_exe_folder / "Wuthering Waves.exe")
 
 
@@ -166,8 +167,8 @@ config = {
         'lib': 'onnxocr',
         'auto_simplify': True,
         'params': {
-            'use_openvino': True,
-            'use_npu': True,
+            'use_openvino': sys.platform == "win32",
+            'use_npu': sys.platform == "win32",
         }
     },
     'my_app': ['src.globals', 'Globals'],
@@ -197,6 +198,14 @@ config = {
         'force_no_hdr': False,
         'check_night_light': True,
         'force_no_night_light': False,
+    },
+    'macos': {
+        # Match the native game directly. Titles and owner names are localized
+        # and may contain whitespace, while the bundle identifier is stable.
+        'bundle_id': 'com.kurogame.wutheringwaves.global',
+        'interaction': 'MacForeground',
+        'capture_method': ['ScreenCaptureKit'],
+        'fps': 30,
     },
     'window_size': {
         'width': 1200,
@@ -248,6 +257,7 @@ config = {
     'version': version,
     'onetime_tasks': [  # tasks to execute
         ["src.task.DailyTask", "DailyTask"],
+        ["src.task.CharacterMaterialTask", "CharacterMaterialTask"],
         ["src.task.MultiAccountDailyTask", "MultiAccountDailyTask"],
         ["src.task.FarmEchoTask", "FarmEchoTask"],
         ["src.task.AutoRogueTask", "AutoRogueTask"],

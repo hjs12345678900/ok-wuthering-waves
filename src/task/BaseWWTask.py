@@ -1,5 +1,6 @@
 import math
 import re
+import sys
 import time
 from datetime import datetime, timedelta
 from typing import List
@@ -25,6 +26,88 @@ f_white_color = {
 }
 processed_feature = False
 WIDE_MODE_UI_SCALE = 0.75
+TEAM_UI_VARIANCE = 0.03
+MAIN_WORLD_PROBE_TIMEOUT = 3
+MAIN_WORLD_SETTLE_TIME = 0.25
+MAIN_MAX_BACK_ATTEMPTS = 3
+GUIDEBOOK_MENU_POSITION = (0.759, 0.05)
+GUIDEBOOK_TITLE_BOX = (0.03, 0.02, 0.28, 0.11)
+GUIDEBOOK_TITLE_TEXT = [
+    re.compile(r'^索拉指南$'),
+    re.compile(r'^活跃行迹$'),
+    re.compile(r'^活躍行跡$'),
+    re.compile(r'^漂泊日志$'),
+    re.compile(r'^漂泊日誌$'),
+    re.compile(r'^周期挑战$'),
+    re.compile(r'^週期挑戰$'),
+    re.compile(r'^素材获取$'),
+    re.compile(r'^素材獲取$'),
+    re.compile(r'^(Guidebook|Activity|Milestones|Material Acquisition)$', re.IGNORECASE),
+]
+MATERIALS_GUIDE_POSITION = (0.039, 0.427)
+MATERIALS_TITLE_BOX = (0.00, 0.00, 0.18, 0.10)
+MATERIALS_TITLE_TEXT = [
+    re.compile(r'^素材获取$'),
+    re.compile(r'^素材獲取$'),
+    re.compile(r'^Material Acquisition$', re.IGNORECASE),
+]
+MATERIAL_TARGET_BOX = (0.095, 0.095, 0.345, 0.205)
+MATERIAL_TARGET_AVATAR_BOX = (0.102, 0.137, 0.141, 0.190)
+MATERIAL_LOCATION_ACTION_BOX = (0.825, 0.185, 0.960, 0.885)
+MATERIAL_LOCATION_NAME_X = (0.405, 0.760)
+MATERIAL_TARGET_MARKER_X = (0.360, 0.379)
+MATERIAL_DROP_PREVIEW_X = (0.695, 0.830)
+MATERIAL_DROP_ICON_X = (
+    (0.695, 0.748),
+    (0.751, 0.806),
+    (0.809, 0.830),
+)
+MATERIAL_LOCATION_SCROLL_X = 0.973
+MATERIAL_LOCATION_SCROLL_ANCHORS = (0.195, 0.34, 0.49, 0.64, 0.79, 0.875)
+MATERIAL_LOCATION_SCROLL_PROBE = (0.88, 0.72)
+MATERIAL_LOCATION_SCROLL_RESET_STEP = 2
+MATERIAL_LOCATION_SCROLL_RESET_ATTEMPTS = 24
+MATERIAL_LOCATION_SCROLL_STEP = -2
+MATERIAL_LOCATION_SCROLL_MAX_PAGES = 12
+MATERIAL_LOCATION_ACTION_X = 0.895
+MATERIAL_LOCATION_ACTION_TEXT = [
+    re.compile(r'^前往$'),
+    re.compile(r'^直接挑战$'),
+    re.compile(r'^直接挑戰$'),
+    re.compile(r'^(Go|Challenge)$', re.IGNORECASE),
+]
+MATERIAL_LOCATION_DIRECT_TEXT = ('直接挑战', '直接挑戰', 'challenge')
+MATERIAL_LOCATION_UI_TEXT = (
+    '筛选',
+    '篩選',
+    '培养目标',
+    '培養目標',
+    '素材获取',
+    '素材獲取',
+    '武器培养',
+    '武器培養',
+    '角色培养',
+    '角色培養',
+    '声骸培养',
+    '聲骸培養',
+    'filter',
+    'developmenttarget',
+    'materialacquisition',
+)
+SOLO_CHALLENGE_BOX = (0.79, 0.84, 0.98, 0.98)
+SOLO_CHALLENGE_TEXT = [
+    re.compile(r'^单人挑战$'),
+    re.compile(r'^單人挑戰$'),
+    re.compile(r'^(Solo Challenge|Challenge)$', re.IGNORECASE),
+]
+START_CHALLENGE_BOX = (0.75, 0.84, 0.98, 0.98)
+START_CHALLENGE_TEXT = [
+    re.compile(r'^开始挑战$'),
+    re.compile(r'^開始挑戰$'),
+    re.compile(r'^开启挑战$'),
+    re.compile(r'^開啟挑戰$'),
+    re.compile(r'^Start Challenge$', re.IGNORECASE),
+]
 
 
 class BaseWWTask(BaseTask):
@@ -37,6 +120,7 @@ class BaseWWTask(BaseTask):
         self.key_config = self.get_global_config('Game Hotkey')  # 游戏热键配置
         self.next_monthly_card_start = 0
         self.scene: WWScene | None = None
+        self._material_page_dictionary = {}
 
     @property
     def logged_in(self):
@@ -108,8 +192,9 @@ class BaseWWTask(BaseTask):
     @property
     def f_search_box(self):
         f_search_box = self.get_box_by_name('pick_up_f_hcenter_vcenter')
-        f_search_box = f_search_box.copy(x_offset=-f_search_box.width * 0.3,
-                                         width_offset=f_search_box.width * 0.65,
+        horizontal_margin = f_search_box.width * 3
+        f_search_box = f_search_box.copy(x_offset=-horizontal_margin,
+                                         width_offset=horizontal_margin * 2,
                                          height_offset=f_search_box.height * 6.5,
                                          y_offset=-f_search_box.height * 5,
                                          name='search_dialog')
@@ -406,8 +491,16 @@ class BaseWWTask(BaseTask):
             return True
 
     def get_stamina(self):
-        boxes = self.wait_ocr(0.49, 0.0, 0.92, 0.10, raise_if_not_found=False,
-                              match=[number_re, stamina_re])
+        boxes = self.wait_ocr(
+            0.49,
+            0.0,
+            0.92,
+            0.10,
+            raise_if_not_found=False,
+            match=[number_re, stamina_re],
+            time_out=3,
+            settle_time=0.5,
+        )
         if not boxes:
             self.screenshot('stamina_error')
             return -1, -1, -1
@@ -673,8 +766,15 @@ class BaseWWTask(BaseTask):
         return super().sleep(timeout - self.check_for_monthly_card())
 
     def wait_in_team_and_world(self, time_out=10, raise_if_not_found=True, esc=False):
+        if esc:
+            try:
+                return self.ensure_main(esc=True, time_out=time_out)
+            except Exception:
+                if raise_if_not_found:
+                    raise
+                return None
         success = self.wait_until(self.in_team_and_world, time_out=time_out, raise_if_not_found=raise_if_not_found,
-                                  post_action=lambda: self.back(after_sleep=2) if esc else None)
+                                  post_action=None)
         if success:
             self.sleep(0.1)
         return success
@@ -683,10 +783,49 @@ class BaseWWTask(BaseTask):
         self.info_set('current task', f'wait main esc={esc}')
         if not self.logged_in:
             time_out = 600
-        if not self.wait_until(lambda: self.is_main(esc=esc), time_out=time_out, raise_if_not_found=False):
-            raise Exception('Please start in game world and in team!')
-        self.sleep(0.5)
-        self.info_set('current task', f'in main esc={esc}')
+        interaction = getattr(getattr(self, 'executor', None), 'interaction', None)
+        clickable = getattr(interaction, 'clickable', None)
+        if callable(clickable) and not clickable():
+            self.log_error('game window is not foreground; stop before sending input')
+            raise Exception('Please keep the game window in the foreground!')
+
+        start = time.time()
+        back_attempts = 0
+        max_back_attempts = 0 if sys.platform == 'darwin' else MAIN_MAX_BACK_ATTEMPTS
+        while time.time() - start < time_out:
+            remaining = time_out - (time.time() - start)
+            found = self.wait_until(
+                lambda: self.is_main(esc=False),
+                time_out=max(0.1, min(MAIN_WORLD_PROBE_TIMEOUT, remaining)),
+                settle_time=MAIN_WORLD_SETTLE_TIME,
+                raise_if_not_found=False,
+            )
+            if found:
+                self.sleep(0.5)
+                self.info_set('current task', f'in main esc={esc}')
+                return True
+
+            if not esc or back_attempts >= max_back_attempts:
+                break
+            if callable(clickable) and not clickable():
+                self.log_error('game window left foreground; stop before sending Esc')
+                raise Exception('Please keep the game window in the foreground!')
+
+            back_attempts += 1
+            self.log_info(
+                f'world not confirmed; close one menu layer '
+                f'({back_attempts}/{max_back_attempts})'
+            )
+            self.back(after_sleep=2)
+
+        if sys.platform == 'darwin' and esc:
+            self.log_error(
+                'world verification failed on macOS; no Esc was sent from an unknown page'
+            )
+        self.log_error(
+            f'world verification failed after {back_attempts} guarded Esc attempt(s); stop task'
+        )
+        raise Exception('Please start in game world and in team!')
 
     def is_main(self, esc=True):
         if self.in_team_and_world():
@@ -697,9 +836,8 @@ class BaseWWTask(BaseTask):
         if self.handle_monthly_card():
             return False
         if esc:
-            self.log_debug('main esc')
-            self.back(after_sleep=2)
-            return False
+            self.log_debug('is_main no longer sends Esc; ensure_main owns guarded retries')
+        return False
 
     def wait_login(self):
         if not self.logged_in:
@@ -889,11 +1027,17 @@ class BaseWWTask(BaseTask):
 
     def in_team(self):
         c1 = self.find_one('char_1_text',
-                           threshold=0.8)
+                           threshold=0.8,
+                           horizontal_variance=TEAM_UI_VARIANCE,
+                           vertical_variance=TEAM_UI_VARIANCE)
         c2 = self.find_one('char_2_text',
-                           threshold=0.8)
+                           threshold=0.8,
+                           horizontal_variance=TEAM_UI_VARIANCE,
+                           vertical_variance=TEAM_UI_VARIANCE)
         c3 = self.find_one('char_3_text',
-                           threshold=0.8)
+                           threshold=0.8,
+                           horizontal_variance=TEAM_UI_VARIANCE,
+                           vertical_variance=TEAM_UI_VARIANCE)
         arr = [c1, c2, c3]
         # logger.debug(f'in_team check {arr}')
         current = -1
@@ -986,7 +1130,7 @@ class BaseWWTask(BaseTask):
             self.log_info('send f2 key mouse key to open the book')
             self.send_key_down('alt')
             self.sleep(0.05)
-            self.click_relative(0.77, 0.05)
+            self.click_relative(*GUIDEBOOK_MENU_POSITION)
             self.sleep(0.02)
             self.send_key_up('alt')
             self.sleep(4)
@@ -997,6 +1141,52 @@ class BaseWWTask(BaseTask):
         self.sleep(2)
         self.click_box(gray_book_boss, after_sleep=1.5)
         return gray_book_boss
+
+    def open_materials_book(self):
+        """Open the current Material Acquisition page without old icon templates."""
+        guidebook_page = self.wait_guidebook_page(time_out=0.8)
+        if guidebook_page:
+            self.log_info('reuse the open guidebook for material acquisition')
+        else:
+            self.ensure_main()
+            book_key = self.key_config.get('Guidebook Key', self.key_config.get('索拉指南', 'f2'))
+            if self.in_team_and_world():
+                self.send_key(book_key, after_sleep=4)
+            if self.in_team_and_world():
+                self.send_key_down('alt')
+                self.sleep(0.05)
+                self.click_relative(*GUIDEBOOK_MENU_POSITION)
+                self.sleep(0.02)
+                self.send_key_up('alt')
+                self.sleep(4)
+
+            if not self.wait_guidebook_page(time_out=3):
+                self.log_error('guidebook verification failed; skip material page coordinate')
+                raise Exception('guidebook verification failed')
+
+        self.click_relative(*MATERIALS_GUIDE_POSITION, after_sleep=1)
+        page = self.wait_ocr(
+            *MATERIALS_TITLE_BOX,
+            match=MATERIALS_TITLE_TEXT,
+            time_out=3,
+            settle_time=0.5,
+            raise_if_not_found=False,
+        )
+        if page:
+            return True
+        self.log_error('material acquisition page verification failed; stop farming')
+        self.ensure_main()
+        raise Exception('material acquisition page verification failed')
+
+    def wait_guidebook_page(self, time_out=3):
+        """Verify a guidebook page by its top-left title, not legacy icons."""
+        return self.wait_ocr(
+            *GUIDEBOOK_TITLE_BOX,
+            match=GUIDEBOOK_TITLE_TEXT,
+            time_out=time_out,
+            settle_time=0.3,
+            raise_if_not_found=False,
+        )
 
     def click_traval_button(self):
         for feature_name in ['fast_travel_custom', 'gray_teleport', 'remove_custom']:
@@ -1073,10 +1263,551 @@ class BaseWWTask(BaseTask):
         )
 
     def click_team_challenge(self):
-        self.wait_click_feature('team_start_challenge', raise_if_not_found=True, after_sleep=1)
+        """Start a domain through either the old or current two-page flow."""
+        if self.wait_click_feature(
+                'team_start_challenge',
+                raise_if_not_found=False,
+                time_out=2,
+                after_sleep=1):
+            return True
+
+        challenge_boxes = self.wait_ocr(
+            *SOLO_CHALLENGE_BOX,
+            match=SOLO_CHALLENGE_TEXT,
+            threshold=0.2,
+            time_out=3,
+            settle_time=0.4,
+            raise_if_not_found=False,
+        ) or []
+        if challenge_boxes:
+            challenge = max(challenge_boxes, key=lambda box: box.x)
+            self.log_info(
+                f'click solo challenge by OCR: {challenge.name}'
+            )
+            self.click_box(challenge, after_sleep=1)
+        else:
+            self.screenshot('solo_challenge_not_found')
+            raise RuntimeError(
+                'solo challenge button was not found by template or OCR'
+            )
+
+        if self.wait_click_feature(
+                'team_start_challenge',
+                raise_if_not_found=False,
+                time_out=10,
+                after_sleep=1):
+            self.log_info('click team-page start challenge by template')
+            return True
+
+        start_boxes = self.wait_ocr(
+            *START_CHALLENGE_BOX,
+            match=START_CHALLENGE_TEXT,
+            threshold=0.2,
+            time_out=3,
+            settle_time=0.4,
+            raise_if_not_found=False,
+        ) or []
+        if start_boxes:
+            start_button = max(start_boxes, key=lambda box: box.x)
+            self.log_info(
+                f'click team-page start challenge by OCR: '
+                f'{start_button.name}'
+            )
+            self.click_box(start_button, after_sleep=1)
+            return True
+
+        self.screenshot('team_start_challenge_not_found')
+        raise RuntimeError(
+            'team-page start challenge button was not found by template or OCR'
+        )
 
     def wait_click_travel(self):
         self.wait_until(self.click_traval_button, raise_if_not_found=True, time_out=10)
+
+    def enter_book_domain_target(self, serial_number, total_number, structure=None):
+        """Enter a domain selected from the guidebook.
+
+        Return ``False`` only when the selected map destination is still visibly
+        unavailable after the travel click. Unknown transition states raise
+        instead of being mistaken for a locked region.
+        """
+        is_team_page = self.click_on_book_target(serial_number, total_number, structure)
+        return self.finish_domain_destination(is_team_page)
+
+    def finish_domain_destination(self, is_team_page):
+        """Finish entry after a guidebook location has been selected."""
+        teleport_timeout = getattr(self, 'teleport_timeout', 120)
+        if is_team_page:
+            self.click_team_challenge()
+            self.wait_in_team_and_world(time_out=teleport_timeout)
+            return True
+
+        travel_clicked = self.wait_until(
+            self.click_traval_button,
+            raise_if_not_found=False,
+            time_out=10,
+        )
+        if not travel_clicked:
+            self.log_info('selected domain has no usable travel button')
+            return False
+
+        team_button = self.wait_feature(
+            'team_start_challenge',
+            raise_if_not_found=False,
+            time_out=15,
+            threshold=0.7,
+        )
+        if team_button:
+            self.click(team_button, after_sleep=1)
+            self.wait_in_team_and_world(time_out=teleport_timeout)
+            return True
+
+        # A disabled/unavailable destination remains on the same map panel.
+        # Only that positively identified state is eligible for fallback.
+        for feature_name in ['fast_travel_custom', 'gray_teleport', 'remove_custom']:
+            if self.find_one(feature_name, threshold=0.7):
+                self.log_info('selected domain is unavailable in the current region')
+                return False
+
+        raise RuntimeError('domain travel changed to an unknown page; stop before selecting another target')
+
+    @staticmethod
+    def _normalize_material_text(text):
+        return re.sub(r'[\s·•:：_\-—]+', '', text or '').lower()
+
+    @classmethod
+    def _valid_material_location_name(cls, text):
+        """Reject list chrome that OCR can mistake for a stage name."""
+        normalized = cls._normalize_material_text(text)
+        if len(normalized) < 3 or normalized.startswith('row-'):
+            return False
+        return not any(
+            ui_text in normalized
+            for ui_text in MATERIAL_LOCATION_UI_TEXT
+        )
+
+    def current_material_target_name(self):
+        """Read the display name of the selected cultivation target."""
+        target_boxes = self.ocr(
+            *MATERIAL_TARGET_BOX,
+            threshold=0.2,
+        ) or []
+        ignored = {
+            self._normalize_material_text(text)
+            for text in ('培养目标', '培養目標', 'Development Target', 'UP')
+        }
+        target_parts = []
+        for box in sorted(target_boxes, key=lambda item: (item.y, item.x)):
+            normalized = self._normalize_material_text(box.name)
+            if normalized and normalized not in ignored:
+                target_parts.append(box.name.strip())
+        return ' '.join(dict.fromkeys(target_parts))
+
+    def current_material_target_key(self, category_name):
+        """Read the currently selected cultivation target for cache isolation."""
+        target_name = self.current_material_target_name()
+        target_key = self._normalize_material_text(target_name) or 'current'
+        return f'{category_name}:{target_key}:{self.width}x{self.height}'
+
+    @staticmethod
+    def _material_drop_fingerprint(image):
+        """Build a compact perceptual fingerprint for the material icons."""
+        if image is None or image.size == 0:
+            return None
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        gray = cv2.resize(gray, (16, 16), interpolation=cv2.INTER_AREA)
+        bits = gray >= np.median(gray)
+        return np.packbits(bits.reshape(-1)).tobytes().hex()
+
+    @staticmethod
+    def _material_avatar_histogram(image):
+        if image is None or image.size == 0:
+            return None
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        histogram = cv2.calcHist(
+            [hsv],
+            [0, 1],
+            None,
+            [24, 24],
+            [0, 180, 0, 256],
+        )
+        return cv2.normalize(histogram, histogram)
+
+    def _current_material_target_avatar_histogram(self):
+        avatar_box = self.box_of_screen(
+            *MATERIAL_TARGET_AVATAR_BOX,
+            name='current_cultivation_target_avatar',
+        )
+        return self._material_avatar_histogram(
+            avatar_box.crop_frame(self.frame)
+        )
+
+    def _material_row_visuals(self, row_y, target_avatar_histogram=None):
+        """Read the target-avatar marker and material-drop icon preview.
+
+        The first reward icon is the universal experience reward and is
+        deliberately excluded from the fingerprint. Only the following
+        weapon/skill material icons identify equivalent rows.
+        """
+        marker_box = self.box_of_screen(
+            MATERIAL_TARGET_MARKER_X[0],
+            max(0.185, row_y - 0.060),
+            MATERIAL_TARGET_MARKER_X[1],
+            max(0.20, row_y - 0.018),
+            name='cultivation_target_row_marker',
+        )
+        marker = marker_box.crop_frame(self.frame)
+        marker_saturation = 0.0
+        avatar_similarity = 0.0
+        if marker is not None and marker.size:
+            hsv = cv2.cvtColor(marker, cv2.COLOR_BGR2HSV)
+            saturated = (hsv[:, :, 1] >= 55) & (hsv[:, :, 2] >= 45)
+            marker_saturation = float(np.mean(saturated))
+            marker_histogram = self._material_avatar_histogram(marker)
+            if (
+                    marker_histogram is not None
+                    and target_avatar_histogram is not None):
+                avatar_similarity = max(
+                    0.0,
+                    float(cv2.compareHist(
+                        target_avatar_histogram,
+                        marker_histogram,
+                        cv2.HISTCMP_CORREL,
+                    )),
+                )
+        marker_score = marker_saturation * (0.5 + 0.5 * avatar_similarity)
+
+        drop_box = self.box_of_screen(
+            MATERIAL_DROP_PREVIEW_X[0],
+            max(0.185, row_y - 0.055),
+            MATERIAL_DROP_PREVIEW_X[1],
+            min(0.885, row_y + 0.055),
+            name='material_drop_preview_without_experience',
+        )
+        drop_preview = drop_box.crop_frame(self.frame)
+        icon_fingerprints = []
+        for icon_index, (from_x, to_x) in enumerate(MATERIAL_DROP_ICON_X):
+            icon_box = self.box_of_screen(
+                from_x,
+                max(0.185, row_y - 0.055),
+                to_x,
+                min(0.885, row_y + 0.055),
+                name=f'material_drop_icon_{icon_index + 1}',
+            )
+            fingerprint = self._material_drop_fingerprint(
+                icon_box.crop_frame(self.frame)
+            )
+            if fingerprint:
+                icon_fingerprints.append(fingerprint)
+        return {
+            'target_marker_score': marker_score,
+            'target_marker_saturation': marker_saturation,
+            'target_avatar_similarity': avatar_similarity,
+            'is_target_row': (
+                marker_saturation >= 0.08
+                and avatar_similarity >= 0.10
+            ),
+            'drop_fingerprint': self._material_drop_fingerprint(drop_preview),
+            'material_icon_fingerprints': tuple(icon_fingerprints),
+        }
+
+    def _visible_material_locations(self, scroll_anchor):
+        """Read the visible right-hand location rows on Material Acquisition."""
+        action_boxes = self.ocr(
+            *MATERIAL_LOCATION_ACTION_BOX,
+            match=MATERIAL_LOCATION_ACTION_TEXT,
+            threshold=0.2,
+        ) or []
+        screen_height = max(self.height_of_screen(1), 1)
+        target_avatar_histogram = (
+            self._current_material_target_avatar_histogram()
+        )
+        locations = []
+        for row_index, action_box in enumerate(action_boxes):
+            row_y = (action_box.y + action_box.height / 2) / screen_height
+            name_boxes = self.ocr(
+                MATERIAL_LOCATION_NAME_X[0],
+                max(0.185, row_y - 0.075),
+                MATERIAL_LOCATION_NAME_X[1],
+                max(0.20, row_y - 0.012),
+                threshold=0.2,
+            ) or []
+            location_name = ''.join(
+                box.name for box in sorted(name_boxes, key=lambda box: box.x)
+            )
+            normalized_name = self._normalize_material_text(location_name)
+            if not self._valid_material_location_name(location_name):
+                self.log_debug(
+                    f'ignore non-stage material row OCR: '
+                    f'{location_name or "<empty>"} ({action_box.name})'
+                )
+                continue
+            normalized_action = self._normalize_material_text(action_box.name)
+            is_direct = any(
+                direct_text in normalized_action
+                for direct_text in MATERIAL_LOCATION_DIRECT_TEXT
+            )
+            location = {
+                'name': location_name or f'row-{row_index + 1}',
+                'normalized_name': normalized_name or f'row-{row_index + 1}',
+                'action': action_box.name,
+                'is_direct': is_direct,
+                'scroll_anchor': scroll_anchor,
+                'row_y': row_y,
+                'row_index': row_index,
+            }
+            location.update(self._material_row_visuals(
+                row_y,
+                target_avatar_histogram=target_avatar_histogram,
+            ))
+            locations.append(location)
+        return locations
+
+    def build_material_page_dictionary(
+            self,
+            category_name,
+            force=False,
+            visible_selector=None):
+        """Index the current target's scrollable regional location list.
+
+        The cache key includes the current cultivation target and resolution,
+        so character changes and layout changes build a separate entry.
+        ``visible_selector`` may return a currently visible row to stop the
+        scan before that row moves away.
+        """
+        target_key = self.current_material_target_key(category_name)
+        if not force and target_key in self._material_page_dictionary:
+            return self._material_page_dictionary[target_key]
+
+        locations_by_name_and_action = {}
+        anonymous_locations = []
+        selected_visible_location = None
+        for scroll_anchor in MATERIAL_LOCATION_SCROLL_ANCHORS:
+            self.click(
+                MATERIAL_LOCATION_SCROLL_X,
+                scroll_anchor,
+                after_sleep=0.7,
+            )
+            visible_locations = self._visible_material_locations(scroll_anchor)
+            for location in visible_locations:
+                if location['normalized_name'].startswith('row-'):
+                    anonymous_locations.append(location)
+                    continue
+                # Keep one direct and one indirect occurrence of the same
+                # material name. Universal materials such as Resonator EXP
+                # appear in several regions; collapsing only by name can
+                # accidentally retain a locked "Go" row and discard an
+                # available "Challenge" row.
+                key = (
+                    location['normalized_name'],
+                    location['is_direct'],
+                )
+                previous = locations_by_name_and_action.get(key)
+                if previous is None:
+                    location['observation_count'] = 1
+                    locations_by_name_and_action[key] = location
+                else:
+                    observation_count = (
+                        previous.get('observation_count', 1) + 1
+                    )
+                    # The same row can be clipped at one scrollbar anchor.
+                    # Retain the observation with the clearest avatar marker
+                    # while recording how consistently OCR saw the identity.
+                    if (
+                            location.get('target_marker_score', 0)
+                            > previous.get('target_marker_score', 0)):
+                        location['observation_count'] = observation_count
+                        locations_by_name_and_action[key] = location
+                    else:
+                        previous['observation_count'] = observation_count
+            if visible_selector is not None:
+                indexed_locations = list(
+                    locations_by_name_and_action.values()
+                )
+                indexed_locations.extend(anonymous_locations)
+                selected_visible_location = visible_selector(
+                    visible_locations,
+                    indexed_locations,
+                )
+                if selected_visible_location is not None:
+                    break
+
+        locations = list(locations_by_name_and_action.values())
+        if not locations:
+            locations = anonymous_locations
+        locations.sort(key=lambda location: (
+            location['scroll_anchor'],
+            location['row_y'],
+        ))
+        catalog = {
+            'target_key': target_key,
+            'category': category_name,
+            'locations': locations,
+            'selected_visible_location': selected_visible_location,
+        }
+        self._material_page_dictionary[target_key] = catalog
+        self.info_set('Material locations indexed', len(locations))
+        self.log_info(
+            f'indexed {len(locations)} material location(s) for {target_key}'
+        )
+        return catalog
+
+    @staticmethod
+    def order_material_locations(locations, preferred_index=0):
+        """Prefer verified direct challenges, then preserve configured order."""
+        if not locations:
+            return []
+        preferred_index = max(0, min(preferred_index, len(locations) - 1))
+        rotated = locations[preferred_index:] + locations[:preferred_index]
+        direct = [location for location in rotated if location['is_direct']]
+        indirect = [location for location in rotated if not location['is_direct']]
+        return direct + indirect
+
+    def enter_visible_material_location(self, selected):
+        """Click a verified material row that is still visible."""
+        self.log_info(
+            f"select material location {selected['name']} "
+            f"({selected['action']})"
+        )
+        self.click(
+            MATERIAL_LOCATION_ACTION_X,
+            selected['row_y'],
+            after_sleep=1,
+        )
+        if selected.get('is_direct'):
+            # "Direct Challenge" opens the domain-detail/team flow directly.
+            # Its close-button template is not stable across capture backends,
+            # so start the already-known challenge flow instead of waiting for
+            # a map/team-page template to prove the transition.
+            self.log_info(
+                'direct material challenge selected; continue through '
+                'solo/team challenge pages'
+            )
+            return self.finish_domain_destination(is_team_page=True)
+
+        destination = self.wait_feature(
+            ['fast_travel_custom', 'gray_teleport', 'remove_custom', 'team_close'],
+            time_out=10,
+            settle_time=0.5,
+            raise_if_not_found=True,
+        )
+        return self.finish_domain_destination(destination.name == 'team_close')
+
+    def enter_material_location(self, location):
+        """Restore and click one indexed material location."""
+        self.click(
+            MATERIAL_LOCATION_SCROLL_X,
+            location['scroll_anchor'],
+            after_sleep=0.7,
+        )
+        visible_locations = self._visible_material_locations(
+            location['scroll_anchor']
+        )
+        selected = self._exact_material_location(location, visible_locations)
+        if selected is None:
+            selected = self._search_material_location_by_scrolling(location)
+        if selected is None:
+            raise RuntimeError(
+                f"material location disappeared after exact scroll search: "
+                f"{location['name']} ({location['action']})"
+            )
+
+        return self.enter_visible_material_location(selected)
+
+    @staticmethod
+    def _exact_material_location(location, visible_locations):
+        """Match the indexed row without substituting a nearby material.
+
+        A stage can occur in both locked and unlocked regions. The action type
+        is therefore part of the identity: a saved ``直接挑战`` row must never
+        be restored as a nearby ``前往`` row.
+        """
+        return next(
+            (
+                visible
+                for visible in visible_locations
+                if (
+                    visible['normalized_name'] == location['normalized_name']
+                    and visible['is_direct'] == location['is_direct']
+                )
+            ),
+            None,
+        )
+
+    def _search_material_location_by_scrolling(self, location):
+        """Reset the material list, then scan downward for one exact row."""
+        self.log_info(
+            f"restore missed {location['name']} ({location['action']}); "
+            "scan the material list from top"
+        )
+        probe_x, probe_y = MATERIAL_LOCATION_SCROLL_PROBE
+        for _ in range(MATERIAL_LOCATION_SCROLL_RESET_ATTEMPTS):
+            self.scroll_relative(
+                probe_x,
+                probe_y,
+                MATERIAL_LOCATION_SCROLL_RESET_STEP,
+            )
+            self.sleep(0.03)
+        self.sleep(0.7)
+
+        for page_index in range(MATERIAL_LOCATION_SCROLL_MAX_PAGES):
+            visible_locations = self._visible_material_locations(page_index)
+            visible_summary = ', '.join(
+                f"{visible['name']} ({visible['action']})"
+                for visible in visible_locations
+            ) or 'none'
+            self.log_info(
+                f"material scroll page {page_index + 1}: {visible_summary}"
+            )
+            selected = self._exact_material_location(
+                location,
+                visible_locations,
+            )
+            if selected is not None:
+                self.log_info(
+                    f"restored exact material location {selected['name']} "
+                    f"({selected['action']}) on scroll page {page_index + 1}"
+                )
+                return selected
+
+            self.scroll_relative(
+                probe_x,
+                probe_y,
+                MATERIAL_LOCATION_SCROLL_STEP,
+            )
+            self.sleep(0.7)
+
+        self.log_error(
+            f"exact material location not found after scrolling: "
+            f"{location['name']} ({location['action']})"
+        )
+        return None
+
+    def leave_unavailable_domain_page(self, max_back_attempts=3):
+        """Return from a known unavailable map destination to the guidebook.
+
+        The first Esc commonly closes only the selected teleport-point panel,
+        leaving the full map open. Since this method is called only from a
+        positively identified map destination, bounded additional Esc presses
+        are safe and necessary.
+        """
+        for attempt in range(1, max_back_attempts + 1):
+            self.back(after_sleep=1)
+            if self.wait_guidebook_page(time_out=1.5):
+                self.log_info(
+                    f'returned from unavailable destination to guidebook '
+                    f'after {attempt} back attempt(s)'
+                )
+                return True
+            if self.in_team_and_world():
+                self.log_info(
+                    f'returned from unavailable destination to world '
+                    f'after {attempt} back attempt(s)'
+                )
+                self.open_materials_book()
+                return True
+        self.log_error('could not safely return from the unavailable domain page')
+        return False
 
     def wait_book(self, feature="gray_book_all_monsters", time_out=3):
         gray_book_boss = self.wait_until(

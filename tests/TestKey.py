@@ -15,8 +15,12 @@ class TestKey(TaskTestCase):
         self._set_key_before_test = self.task.set_key
 
     def tearDown(self):
-        self.task.key_config.clear()
-        self.task.key_config.update(self._key_config_before_test)
+        # Restore atomically: Config.clear() persists immediately, while the
+        # inherited dict.update() does not, which used to leave the user's
+        # Game Hotkey.json empty after this test.
+        dict.clear(self.task.key_config)
+        dict.update(self.task.key_config, self._key_config_before_test)
+        self.task.key_config.save_file()
         self.task.set_key = self._set_key_before_test
         super().tearDown()
 
@@ -30,8 +34,8 @@ class TestKey(TaskTestCase):
         self.set_image('tests/images/in_combat.png')
         self.task.load_hotkey(force=True)
         self.assertEqual(self.task.key_config['Resonance Key'], 'a')
-        self.assertEqual(self.task.key_config['Liberation Key'], 'q')
-        self.assertEqual(self.task.key_config['Echo Key'], 'r')
+        self.assertEqual(self.task.key_config['Liberation Key'], 'r')
+        self.assertEqual(self.task.key_config['Echo Key'], 'q')
         self.assertEqual(self.task.key_config['Tool Key'], 'a')
 
     def test_load_hotkey_skips_set_key_when_short_action_bar_visible(self):

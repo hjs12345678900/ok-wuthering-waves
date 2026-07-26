@@ -175,6 +175,12 @@ class TestChar(TaskTestCase):
             return char_cls(task_arg, index, char_name=char_name, confidence=0.9)
 
         base_combat_task_module.get_char_by_pos = get_char_by_pos
+        task._load_char_slot = lambda index, box_name: get_char_by_pos(
+            task,
+            box_name,
+            index,
+            task.chars[index],
+        )
         try:
             self.assertTrue(task.load_chars())
             self.assertEqual(info_sets, [('Chars', 'CharA, CharB, CharC')])
@@ -213,7 +219,9 @@ class TestChar(TaskTestCase):
         self.assertEqual(combat._choose_switch_target(current, False), sub_dps)
 
         sub_dps.last_buff_time = time.time()
-        healer.last_buff_time = time.time() - 10
+        # Avoid a timing tie: healer has about 12 seconds of buff remaining,
+        # while sub DPS has about 14 seconds remaining.
+        healer.last_buff_time = time.time() - 12
         self.assertEqual(combat._choose_switch_target(current, False), healer)
 
         combat.chars = [current, healer, sub_dps]
@@ -483,6 +491,32 @@ class TestChar(TaskTestCase):
         self.assertTrue(aemeath.lib())
         self.assertFalse(aemeath.pending_lib2)
 
+    def test_aemeath_material_rotation_allows_immediate_liberation(self):
+        class Task:
+            combat_start = time.time()
+
+            def time_elapsed_accounting_for_freeze(self, start, intro_motion_freeze=False):
+                return time.time() - start
+
+            def allow_immediate_visible_liberation(self):
+                return True
+
+        aemeath = Aemeath(Task(), 0)
+
+        self.assertFalse(aemeath.lib1_unlocked())
+        self.assertTrue(aemeath.can_cast_lib1())
+
+    def test_character_rotation_timeout_uses_task_farming_budget(self):
+        class NormalTask:
+            pass
+
+        class FastTask:
+            def prefer_fast_character_rotation(self):
+                return True
+
+        self.assertEqual(10, BaseChar(NormalTask(), 0).rotation_timeout(10, 4))
+        self.assertEqual(4, BaseChar(FastTask(), 0).rotation_timeout(10, 4))
+
     def test_aemeath_heavy_prepares_lib2_only_when_liberation_cooldown_is_ready(self):
         class Task:
             def __init__(self):
@@ -498,11 +532,14 @@ class TestChar(TaskTestCase):
                 pass
 
         class TrackingAemeath(Aemeath):
-            def has_long_action(self):
-                return True
+            def heavy_ready_state(self):
+                return 'human'
 
             def heavy_wait_highlight_down(self):
                 return True
+
+            def post_heavy_normal_attack_burst(self):
+                pass
 
             def click_liberation(self, **kwargs):
                 return True
@@ -519,10 +556,12 @@ class TestChar(TaskTestCase):
         self.assertTrue(aemeath.handle_heavy())
         self.assertFalse(aemeath.pending_lib2)
 
+        aemeath.last_heavy_attempt = -1
         aemeath.last_liber = time.time()
         self.assertTrue(aemeath.handle_heavy())
         self.assertFalse(aemeath.pending_lib2)
 
+        aemeath.last_heavy_attempt = -1
         aemeath.last_liber = time.time() - aemeath.LIBERATION_COOLDOWN
         self.assertTrue(aemeath.handle_heavy())
         self.assertTrue(aemeath.pending_lib2)
@@ -595,10 +634,10 @@ class TestChar(TaskTestCase):
         self.assertTrue(aemeath.should_wait_for_lib2())
         self.assertEqual(aemeath.get_switch_priority(), SwitchPriority.MUST)
 
-    def test_aemeath_recent_stored_intro_attempts_lib1_before_enhance_e(self):
+    def test_aemeath_enhanced_e_preempts_visible_lib1(self):
         class Task:
-            def find_one(self, template, threshold=None):
-                return template == 'aemeath_e1'
+            def next_frame(self):
+                pass
 
         class TrackingAemeath(Aemeath):
             def __init__(self, task):
@@ -611,6 +650,11 @@ class TestChar(TaskTestCase):
 
             def click_liberation(self, **kwargs):
                 self.actions.append('lib1')
+                return True
+
+            def cast_enhanced_e_if_ready(self):
+                self.actions.append('enhanced_e')
+                self.done = True
                 return True
 
             def handle_heavy(self):
@@ -628,8 +672,7 @@ class TestChar(TaskTestCase):
         aemeath = TrackingAemeath(Task())
         aemeath.intro_liberation_time = time.time() - aemeath.INTRO_LIBERATION_DELAY + 0.1
         aemeath.perform_everything()
-        self.assertEqual(aemeath.actions, ['lib1'])
-        self.assertEqual(aemeath.intro_liberation_time, -1)
+        self.assertEqual(aemeath.actions, ['enhanced_e'])
 
     def test_switch_priority_hooks(self):
         class Task:

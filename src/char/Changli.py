@@ -7,13 +7,36 @@ from src.char.BaseChar import BaseChar, SwitchPriority, forte_white_color
 
 
 class Changli(BaseChar):
+    OPTIMISTIC_LIBERATION_RETRY_INTERVAL = 2.0
+    OPTIMISTIC_LIBERATION_CONFIRM_TIME = 0.4
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.enhanced_normal = False
+        self.last_optimistic_liberation_attempt = -1
 
     def reset_state(self):
         super().reset_state()
         self.enhanced_normal = False
+        self.last_optimistic_liberation_attempt = -1
+
+    def should_try_liberation(self):
+        """Allow one bounded R probe when the orange icon lacks white pixels."""
+        if self.liberation_available():
+            return True
+        allow_immediate = getattr(
+            self.task,
+            'allow_immediate_visible_liberation',
+            None,
+        )
+        return (
+            callable(allow_immediate)
+            and allow_immediate()
+            and not self.has_cd('liberation')
+            and self.time_elapsed_accounting_for_freeze(
+                self.last_optimistic_liberation_attempt
+            ) >= self.OPTIMISTIC_LIBERATION_RETRY_INTERVAL
+        )
 
     def get_switch_priority(self, current_char=None, has_intro=False, target_low_con=False):
         if has_intro and current_char and current_char.char_name in {'char_brant'}:
@@ -47,7 +70,10 @@ class Changli(BaseChar):
             self.check_f_on_switch = False
             self.check_combat()
             return self.switch_next_char()
-        if not (forte >= 3 and self.resonance_available()) and self.liberation_available():
+        if (
+                not (forte >= 3 and self.resonance_available())
+                and self.should_try_liberation()
+        ):
             if self.liberation_and_heavy():
                 self.check_f_on_switch = False
                 return self.switch_next_char()
@@ -85,7 +111,7 @@ class Changli(BaseChar):
             self.heavy_click_forte(check_fun=self.is_mouse_forte_full)
             forte = 0
             self.sleep(1)
-        if self.liberation_available() and self.liberation_and_heavy():
+        if self.should_try_liberation() and self.liberation_and_heavy():
             self.sleep(0.6)
             forte = 0
         if forte < 3 and self.flick_resonance(send_click=False):
@@ -108,6 +134,29 @@ class Changli(BaseChar):
         start = time.time()
         last_click = 0
         clicked = False
+        if not self.liberation_available():
+            # The orange Fire icon can look ready both before and after its
+            # energy is spent. Probe once and require an observable response;
+            # otherwise return to E/basic attacks instead of blocking until
+            # the generic skill timeout.
+            self.last_optimistic_liberation_attempt = time.time()
+            self.logger.info(
+                'Changli orange R candidate: press once and verify'
+            )
+            self.send_liberation_key()
+            clicked = self.task.wait_until(
+                lambda: (
+                    not self.task.in_team()[0]
+                    or self.has_cd('liberation')
+                ),
+                time_out=self.OPTIMISTIC_LIBERATION_CONFIRM_TIME,
+            )
+            if not clicked:
+                self.logger.info(
+                    'Changli R probe had no effect; resume E and normal attacks'
+                )
+                return False
+            self.record_liberation_use()
         while time.time() - start < wait_if_cd_ready and not self.liberation_available() and not self.has_cd(
                 'liberation'):
             self.logger.debug(f'click_liberation wait ready {wait_if_cd_ready}')

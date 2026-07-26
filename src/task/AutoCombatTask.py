@@ -46,9 +46,31 @@ class AutoCombatTask(BaseCombatTask, TriggerTask):
         logger.info(f'warm_up_char_features loaded {len(char_names)} character templates')
 
     def run(self):
-        self.warm_up_char_features()
         ret = False
+        from src.task.DomainTask import (
+            domain_leave_confirmation_visible,
+            manual_domain_exit_override_active,
+        )
+        if manual_domain_exit_override_active():
+            self.log_info(
+                'manual override: Auto Combat remains suppressed after '
+                'the domain task yielded to the player'
+            )
+            return ret
+        self.warm_up_char_features()
         if not self.scene.in_team(self.in_team_and_world):
+            return ret
+        raw_in_team = self.in_team()[0]
+        if not raw_in_team:
+            # A domain leave-confirmation overlay hides the live HUD while the
+            # cached scene can still report the previous combat state. Never
+            # let this trigger task resume inputs after a one-time domain task
+            # has yielded to the player.
+            if domain_leave_confirmation_visible(self):
+                self.log_info(
+                    'manual override: Auto Combat suppressed while leave '
+                    'confirmation is visible'
+                )
             return ret
         self.use_liberation = self.config.get('Use Liberation')
         if not self.use_liberation and not self.in_world():  # 仅大世界生效

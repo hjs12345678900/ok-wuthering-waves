@@ -215,6 +215,17 @@ class BaseChar:
         self.do_perform()
         self.logger.debug(f'set current char false {self.index}')
 
+    def rotation_timeout(self, normal, fast):
+        """Select a bounded timeout without replacing this character's module."""
+        prefer_fast = getattr(
+            self.task,
+            'prefer_fast_character_rotation',
+            None,
+        )
+        if callable(prefer_fast) and prefer_fast():
+            return fast
+        return normal
+
     def wait_down(self, click=True):
         """等待角色从空中落下到地面。"""
         if not self.task.has_lavitator and self.has_intro:
