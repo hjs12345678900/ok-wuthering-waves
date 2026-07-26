@@ -95,7 +95,7 @@
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/ok-oldking/ok-wuthering-waves.git
+git clone --recurse-submodules https://github.com/ok-oldking/ok-wuthering-waves.git
 cd ok-wuthering-waves
 
 # 2. 创建虚拟环境
@@ -116,6 +116,12 @@ python main.py
 
 # 或启动 Debug 版本
 python main_debug.py
+```
+
+如果此前已经在未带 `--recurse-submodules` 的情况下克隆，请补充初始化模板素材：
+
+```bash
+git submodule update --init --recursive
 ```
 
 #### 同时开发本地 `ok-script`

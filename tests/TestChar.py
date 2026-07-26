@@ -175,6 +175,12 @@ class TestChar(TaskTestCase):
             return char_cls(task_arg, index, char_name=char_name, confidence=0.9)
 
         base_combat_task_module.get_char_by_pos = get_char_by_pos
+        task._load_char_slot = lambda index, box_name: get_char_by_pos(
+            task,
+            box_name,
+            index,
+            task.chars[index],
+        )
         try:
             self.assertTrue(task.load_chars())
             self.assertEqual(info_sets, [('Chars', 'CharA, CharB, CharC')])
@@ -213,7 +219,9 @@ class TestChar(TaskTestCase):
         self.assertEqual(combat._choose_switch_target(current, False), sub_dps)
 
         sub_dps.last_buff_time = time.time()
-        healer.last_buff_time = time.time() - 10
+        # Avoid a timing tie: healer has about 12 seconds of buff remaining,
+        # while sub DPS has about 14 seconds remaining.
+        healer.last_buff_time = time.time() - 12
         self.assertEqual(combat._choose_switch_target(current, False), healer)
 
         combat.chars = [current, healer, sub_dps]
@@ -530,6 +538,9 @@ class TestChar(TaskTestCase):
             def heavy_wait_highlight_down(self):
                 return True
 
+            def post_heavy_normal_attack_burst(self):
+                pass
+
             def click_liberation(self, **kwargs):
                 return True
 
@@ -545,10 +556,12 @@ class TestChar(TaskTestCase):
         self.assertTrue(aemeath.handle_heavy())
         self.assertFalse(aemeath.pending_lib2)
 
+        aemeath.last_heavy_attempt = -1
         aemeath.last_liber = time.time()
         self.assertTrue(aemeath.handle_heavy())
         self.assertFalse(aemeath.pending_lib2)
 
+        aemeath.last_heavy_attempt = -1
         aemeath.last_liber = time.time() - aemeath.LIBERATION_COOLDOWN
         self.assertTrue(aemeath.handle_heavy())
         self.assertTrue(aemeath.pending_lib2)
